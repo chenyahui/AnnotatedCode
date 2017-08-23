@@ -58,7 +58,7 @@ struct stCoRoutineEnv_t
 	stCoEpoll_t *pEpoll;  //主要是epoll，作为协程的调度器
 
 	//for copy stack log lastco and nextco
-	stCoRoutine_t* pending_co;
+	stCoRoutine_t* pending_co;  
 	stCoRoutine_t* occupy_co;
 };
 //int socket(int domain, int type, int protocol);
@@ -238,7 +238,6 @@ void inline PopHead( TLink*apLink )
 	}
 }
 
-/**
 
 template <class TNode,class TLink>
 void inline Join( TLink*apLink,TLink *apOther )
@@ -271,6 +270,10 @@ void inline Join( TLink*apLink,TLink *apOther )
 }
 
 /////////////////for copy stack //////////////////////////
+/**
+* 分配一个栈内存
+* @param stack_size的大小
+*/
 stStackMem_t* co_alloc_stackmem(unsigned int stack_size)
 {
 	stStackMem_t* stack_mem = (stStackMem_t*)malloc(sizeof(stStackMem_t));
@@ -303,6 +306,9 @@ stShareStack_t* co_alloc_sharestack(int count, int stack_size)
 	return share_stack;
 }
 
+/*
+* 在共享栈中，获取协程的栈内存
+*/
 static stStackMem_t* co_get_stackmem(stShareStack_t* share_stack)
 {
 	if (!share_stack)
@@ -534,7 +540,7 @@ struct stCoRoutine_t *co_create_env( stCoRoutineEnv_t * env, const stCoRoutineAt
 	}
 	if( at.stack_size <= 0 )
 	{
-		at.stack_size = 128 * 1024;
+		at.stack_size = 128 * 1024; // 默认的为128k
 	}
 	else if( at.stack_size > 1024 * 1024 * 8 )
 	{
@@ -559,11 +565,13 @@ struct stCoRoutine_t *co_create_env( stCoRoutineEnv_t * env, const stCoRoutineAt
 	stStackMem_t* stack_mem = NULL;
 	if( at.share_stack )
 	{
+		// 如果采用了共享栈模式，则获取到它的共享栈的内存
 		stack_mem = co_get_stackmem( at.share_stack);
 		at.stack_size = at.share_stack->stack_size;
 	}
 	else
 	{
+		// 如果没有采用共享栈，则分配内存
 		stack_mem = co_alloc_stackmem(at.stack_size);
 	}
 	lp->stack_mem = stack_mem;
@@ -647,6 +655,7 @@ void co_resume( stCoRoutine_t *co )
 
 /*
 * 主动将协程让给其他协程
+*
 * @param env 协程管理器 
 */
 void co_yield_env( stCoRoutineEnv_t *env )
@@ -670,6 +679,10 @@ void co_yield( stCoRoutine_t *co )
 	co_yield_env( co->env );
 }
 
+/**
+* 将原本占用共享栈的协程的内存保存起来。
+* @param occupy_co 原本占用共享栈的协程
+*/
 void save_stack_buffer(stCoRoutine_t* occupy_co)
 {
 	///copy out
@@ -687,30 +700,43 @@ void save_stack_buffer(stCoRoutine_t* occupy_co)
 	memcpy(occupy_co->save_buffer, occupy_co->stack_sp, len);
 }
 
+/*
+* 将当前栈内容保存到curr中，并将pending_co
+* @param curr
+* @param pending_co 
+*/
 void co_swap(stCoRoutine_t* curr, stCoRoutine_t* pending_co)
 {
  	stCoRoutineEnv_t* env = co_get_curr_thread_env();
 
 	//get curr stack sp
+	// 这个c变量的实现，作用是为了找到目前的栈底，因为c变量是最后一个放入栈中的内容。
 	char c;
 	curr->stack_sp= &c;
 
 	if (!pending_co->cIsShareStack)
-	{
+	{  // 如果没有采用共享栈
+		
 		env->pending_co = NULL;
 		env->occupy_co = NULL;
 	}
 	else 
-	{
-		env->pending_co = pending_co;
+	{   // 如果采用了共享栈
+		
+		env->pending_co = pending_co; 
+		
 		//get last occupy co on the same stack mem
+		// 获取最后一个使用该共享栈的协程
 		stCoRoutine_t* occupy_co = pending_co->stack_mem->occupy_co;
+		
 		//set pending co to occupy thest stack mem;
+		// 将该共享栈的占用者改为pending_co
 		pending_co->stack_mem->occupy_co = pending_co;
 
 		env->occupy_co = occupy_co;
+		
 		if (occupy_co && occupy_co != pending_co)
-		{
+		{  // 如果上一个使用协程不为空,则需要把它的栈内容保存起来。
 			save_stack_buffer(occupy_co);
 		}
 	}
@@ -726,6 +752,7 @@ void co_swap(stCoRoutine_t* curr, stCoRoutine_t* pending_co)
 	if (update_occupy_co && update_pending_co && update_occupy_co != update_pending_co)
 	{
 		//resume stack buffer
+		// 将栈的内容恢复，如果不是共享栈的话，每个协程都有自己独立的栈空间，则不用恢复。
 		if (update_pending_co->save_buffer && update_pending_co->save_size > 0)
 		{
 			memcpy(update_pending_co->stack_sp, update_pending_co->save_buffer, update_pending_co->save_size);
@@ -1184,8 +1211,9 @@ int co_setspecific(pthread_key_t key, const void *value)
 	return 0;
 }
 
-
-
+/*
+* 在本协程中进行禁用hook功能
+*/
 void co_disable_hook_sys()
 {
 	stCoRoutine_t *co = GetCurrThreadCo();
@@ -1194,6 +1222,9 @@ void co_disable_hook_sys()
 		co->cEnableSysHook = 0;
 	}
 }
+/*
+* 检测hook功能是否打开
+*/
 bool co_is_enable_sys_hook()
 {
 	stCoRoutine_t *co = GetCurrThreadCo();
