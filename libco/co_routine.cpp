@@ -506,6 +506,9 @@ inline void TakeAllTimeout( stTimeout_t *apTimeout,unsigned long long allNow,stT
 
 
 }
+/**
+* 协程回调函数的封装
+*/
 static int CoRoutineFunc( stCoRoutine_t *co,void * )
 {
 	if( co->pfn )
@@ -517,7 +520,7 @@ static int CoRoutineFunc( stCoRoutine_t *co,void * )
 	stCoRoutineEnv_t *env = co->env;
 
 	co_yield_env( env );
-
+	// 协程结束后，为何没有内存释放
 	return 0;
 }
 
@@ -1239,7 +1242,9 @@ stCoRoutine_t *co_self()
 	return GetCurrThreadCo();
 }
 
-//co cond
+/*
+* 信号量
+*/
 struct stCoCond_t;
 struct stCoCondItem_t 
 {
@@ -1261,8 +1266,14 @@ static void OnSignalProcessEvent( stTimeoutItem_t * ap )
 }
 
 stCoCondItem_t *co_cond_pop( stCoCond_t *link );
+/*
+*
+* 功能类似于pthread_cond_signal
+* 唤醒等待队列中其中一个协程
+*/
 int co_cond_signal( stCoCond_t *si )
 {
+	// 队列从中取出一个等待项，进行唤醒
 	stCoCondItem_t * sp = co_cond_pop( si );
 	if( !sp ) 
 	{
@@ -1270,10 +1281,15 @@ int co_cond_signal( stCoCond_t *si )
 	}
 	RemoveFromLink<stTimeoutItem_t,stTimeoutItemLink_t>( &sp->timeout );
 
+	// 将其添加到，pstActiveList中，在event_loop中处理
 	AddTail( co_get_curr_thread_env()->pEpoll->pstActiveList,&sp->timeout );
 
 	return 0;
 }
+/**
+*  功能类似于pthread_cond_broadcast
+*  唤醒等待队列中的所有的协程
+*/
 int co_cond_broadcast( stCoCond_t *si )
 {
 	for(;;)
@@ -1289,7 +1305,11 @@ int co_cond_broadcast( stCoCond_t *si )
 	return 0;
 }
 
-
+/**
+* 功能类似于 pthread_cond_wait
+* @link 条件
+* @ms 超时时间 如果为0或者-1，则永久不失效
+*/
 int co_cond_timedwait( stCoCond_t *link,int ms )
 {
 	stCoCondItem_t* psi = (stCoCondItem_t*)calloc(1, sizeof(stCoCondItem_t));
@@ -1297,7 +1317,7 @@ int co_cond_timedwait( stCoCond_t *link,int ms )
 	psi->timeout.pfnProcess = OnSignalProcessEvent;
 
 	if( ms > 0 )
-	{
+	{ 
 		unsigned long long now = GetTickMS();
 		psi->timeout.ullExpireTime = now + ms;
 
@@ -1328,7 +1348,9 @@ int co_cond_free( stCoCond_t * cc )
 	return 0;
 }
 
-
+/**
+* 从队列中取出一个正在等待的协程
+*/
 stCoCondItem_t *co_cond_pop( stCoCond_t *link )
 {
 	stCoCondItem_t *p = link->head;

@@ -22,6 +22,10 @@
 #include <queue>
 #include "co_routine.h"
 using namespace std;
+
+/**
+* 本实例是对条件变量的展示，其作用类似于pthread_cond_wait
+*/
 struct stTask_t
 {
 	int id;

@@ -26,6 +26,9 @@
 #include "co_routine.h"
 #include "co_routine_inner.h"
 
+/*
+* 本实例是对共享栈功能的展示
+*/
 void* RoutineFunc(void* args)
 {
 	// 打开libco的钩子标识
