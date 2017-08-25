@@ -1243,7 +1243,7 @@ stCoRoutine_t *co_self()
 }
 
 /*
-* 信号量
+* 条件变量
 */
 struct stCoCond_t;
 struct stCoCondItem_t 
