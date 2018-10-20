@@ -152,3 +152,5 @@ rules.ninja
 /*.tar.gz
 
 /.vagrant
+
+.vscode

@@ -507,11 +507,18 @@ event_init(void)
 	return (base);
 }
 
+/**
+ * 新建一个event_base
+ * 
+ * event_base 事件总线
+ */ 
 struct event_base *
 event_base_new(void)
 {
 	struct event_base *base = NULL;
+	// 默认的配置
 	struct event_config *cfg = event_config_new();
+
 	if (cfg) {
 		base = event_base_new_with_config(cfg);
 		event_config_free(cfg);
@@ -592,6 +599,9 @@ event_disable_debug_mode(void)
 #endif
 }
 
+/**
+ * 新建event_base，真正的创建逻辑
+ */ 
 struct event_base *
 event_base_new_with_config(const struct event_config *cfg)
 {
@@ -603,6 +613,7 @@ event_base_new_with_config(const struct event_config *cfg)
 	event_debug_mode_too_late = 1;
 #endif
 
+    // 分配空间
 	if ((base = mm_calloc(1, sizeof(struct event_base))) == NULL) {
 		event_warn("%s: calloc", __func__);
 		return NULL;
@@ -631,10 +642,14 @@ event_base_new_with_config(const struct event_config *cfg)
 		gettime(base, &tmp);
 	}
 
+	// 初始化堆
 	min_heap_ctor_(&base->timeheap);
 
+	// 初始化信号的通知管道
 	base->sig.ev_signal_pair[0] = -1;
 	base->sig.ev_signal_pair[1] = -1;
+
+	// 初始化线程通知的管道
 	base->th_notify_fd[0] = -1;
 	base->th_notify_fd[1] = -1;
 
@@ -2490,6 +2505,11 @@ event_get_priority(const struct event *ev)
 	return ev->ev_pri;
 }
 
+/**
+ * 将时间添加到事件循环器中
+ * @ev event
+ * @tv 超时时间
+ */ 
 int
 event_add(struct event *ev, const struct timeval *tv)
 {
@@ -2500,6 +2520,7 @@ event_add(struct event *ev, const struct timeval *tv)
 		return -1;
 	}
 
+	// 加锁
 	EVBASE_ACQUIRE_LOCK(ev->ev_base, th_base_lock);
 
 	res = event_add_nolock_(ev, tv, 0);
@@ -2603,11 +2624,15 @@ event_remove_timer(struct event *ev)
  * except: 1) it requires that we have the lock.  2) if tv_is_absolute is set,
  * we treat tv as an absolute time, not as an interval to add to the current
  * time */
+/**
+ * 
+ */ 
 int
 event_add_nolock_(struct event *ev, const struct timeval *tv,
     int tv_is_absolute)
 {
-	struct event_base *base = ev->ev_base;
+	struct event_base *base = ev->ev_base; // 获取到事件总线
+
 	int res = 0;
 	int notify = 0;
 

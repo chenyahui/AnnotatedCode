@@ -52,12 +52,13 @@
 #include "mm-internal.h"
 #include "changelist-internal.h"
 
-/** An entry for an evmap_io list: notes all the events that want to read or
+/** An entry for an evmap_io list: 
+ *   notes all the events that want to read or
 	write on a given fd, and the number of each.
   */
 struct evmap_io {
 	struct event_dlist events;
-	ev_uint16_t nread;
+	ev_uint16_t nread;  //
 	ev_uint16_t nwrite;
 	ev_uint16_t nclose;
 };
@@ -74,6 +75,10 @@ struct evmap_signal {
    struct evmap_io.  But on other platforms (windows), sockets are not
    0-indexed, not necessarily consecutive, and not necessarily reused.
    There, we use a hashtable to implement evmap_io.
+
+   在一些平台上，新的fd每次0开始递增1。这个时候的map就比较简单，直接用singal_map就可以了。例如linux
+   
+   但是另外一些平台，fd是随机的大整数，例如windows，这个时候，就要用hashtable了，也就是HT。
 */
 #ifdef EVMAP_USE_HT
 struct event_map_entry {
