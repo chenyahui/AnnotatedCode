@@ -93,6 +93,7 @@ struct event* min_heap_pop_(min_heap_t* s)
 	return 0;
 }
 
+// 该节点是否在顶部
 int min_heap_elt_is_top_(const struct event *e)
 {
 	return e->ev_timeout_pos.min_heap_idx == 0;

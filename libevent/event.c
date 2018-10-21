@@ -394,6 +394,8 @@ static void event_debug_assert_not_added_(const struct event *ev) { (void)ev; }
  * on 'base'.  If there is a cached time, return it.  Otherwise, use
  * clock_gettime or gettimeofday as appropriate to find out the right time.
  * Return 0 on success, -1 on failure.
+ * 
+ * 根据event_base，将tp设为当前时间
  */
 static int
 gettime(struct event_base *base, struct timeval *tp)
@@ -627,8 +629,11 @@ event_base_new_with_config(const struct event_config *cfg)
 
 	{
 		struct timeval tmp;
+
+		// 如果用户指定了使用准确时间的配置
 		int precise_time =
 		    cfg && (cfg->flags & EVENT_BASE_FLAG_PRECISE_TIMER);
+
 		int flags;
 		if (should_check_environment && !precise_time) {
 			precise_time = evutil_getenv_("EVENT_PRECISE_TIMER") != NULL;
@@ -637,9 +642,10 @@ event_base_new_with_config(const struct event_config *cfg)
 			}
 		}
 		flags = precise_time ? EV_MONOT_PRECISE : 0;
+
 		evutil_configure_monotonic_time_(&base->monotonic_timer, flags);
 
-		gettime(base, &tmp);
+		gettime(base, &tmp);  //??作用
 	}
 
 	// 初始化堆
@@ -655,8 +661,13 @@ event_base_new_with_config(const struct event_config *cfg)
 
 	TAILQ_INIT(&base->active_later_queue);
 
+	// 初始化io_map
 	evmap_io_initmap_(&base->io);
+
+	// 初始化singal_map
 	evmap_signal_initmap_(&base->sigmap);
+
+	// 初始化changelist
 	event_changelist_init_(&base->changelist);
 
 	base->evbase = NULL;
@@ -1385,8 +1396,11 @@ event_signal_closure(struct event_base *base, struct event *ev)
 	}
 }
 
-/* Common timeouts are special timeouts that are handled as queues rather than
- * in the minheap.  This is more efficient than the minheap if we happen to
+/* 
+ * Common timeouts are special timeouts that are handled as queues rather than
+ * in the minheap.  
+ * 
+ * This is more efficient than the minheap if we happen to
  * know that we're going to get several thousands of timeout events all with
  * the same timeout value.
  *
@@ -2685,14 +2699,17 @@ event_add_nolock_(struct event *ev, const struct timeval *tv,
 		
 		// 如果是普通的事件
 		if (ev->ev_events & (EV_READ|EV_WRITE|EV_CLOSED))
+		    // 将该事件放入到io_map中
 			res = evmap_io_add_(base, ev->ev_fd, ev);
 		// 信号事件
 		else if (ev->ev_events & EV_SIGNAL)
+		    // 将该事件放到signal_map
 			res = evmap_signal_add_(base, (int)ev->ev_fd, ev);
 
-		if (res != -1)
+		if (res != -1)  // 如果该事件放入成功了
 			// 作用是？
 			event_queue_insert_inserted(base, ev);
+
 		if (res == 1) {
 			/* evmap says we need to notify the main thread. */
 			notify = 1;

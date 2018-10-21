@@ -104,6 +104,17 @@ LIST_HEAD相当于定一个list结构体, 其中每个元素的类型是struct t
 LIST_HEAD (event_dlist, event); 
 ```
 
+
+```c
+#define	TAILQ_HEAD(name, type)						\
+__MISMATCH_TAGS_PUSH							\
+struct name {								\
+	struct type *tqh_first;	/* first element */			\
+	struct type **tqh_last;	/* addr of last next element */		\
+	TRACEBUF							\
+}									\
+__MISMATCH_TAGS_POP
+```
 # 当前进度
 看到了evmap_io_add_
 
@@ -119,3 +130,8 @@ https://blog.csdn.net/yusiguyuan/article/details/22936707
 # changelist是什么
 
 libevent内存管理
+
+
+
+# 一些写的比较好的源码解读
+[Libevent源码分析-----Libevent时间管理](https://blog.csdn.net/luotuo44/article/details/38661787)
