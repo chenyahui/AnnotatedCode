@@ -397,7 +397,7 @@ static void event_debug_assert_not_added_(const struct event *ev) { (void)ev; }
  * clock_gettime or gettimeofday as appropriate to find out the right time.
  * Return 0 on success, -1 on failure.
  * 
- * 
+ * 根据event_base，将tp设为当前时间
  */
 static int
 gettime(struct event_base *base, struct timeval *tp)
@@ -511,11 +511,18 @@ event_init(void)
 	return (base);
 }
 
+/**
+ * 新建一个event_base
+ * 
+ * event_base 事件总线
+ */ 
 struct event_base *
 event_base_new(void)
 {
 	struct event_base *base = NULL;
+	// 默认的配置
 	struct event_config *cfg = event_config_new();
+
 	if (cfg) {
 		base = event_base_new_with_config(cfg);
 		event_config_free(cfg);
@@ -596,6 +603,9 @@ event_disable_debug_mode(void)
 #endif
 }
 
+/**
+ * 新建event_base，真正的创建逻辑
+ */ 
 struct event_base *
 event_base_new_with_config(const struct event_config *cfg)
 {
@@ -607,6 +617,7 @@ event_base_new_with_config(const struct event_config *cfg)
 	event_debug_mode_too_late = 1;
 #endif
 
+    // 分配空间
 	if ((base = mm_calloc(1, sizeof(struct event_base))) == NULL) {
 		event_warn("%s: calloc", __func__);
 		return NULL;
@@ -620,8 +631,11 @@ event_base_new_with_config(const struct event_config *cfg)
 
 	{
 		struct timeval tmp;
+
+		// 如果用户指定了使用准确时间的配置
 		int precise_time =
 		    cfg && (cfg->flags & EVENT_BASE_FLAG_PRECISE_TIMER);
+
 		int flags;
 		if (should_check_environment && !precise_time) {
 			precise_time = evutil_getenv_("EVENT_PRECISE_TIMER") != NULL;
@@ -630,22 +644,32 @@ event_base_new_with_config(const struct event_config *cfg)
 			}
 		}
 		flags = precise_time ? EV_MONOT_PRECISE : 0;
+
 		evutil_configure_monotonic_time_(&base->monotonic_timer, flags);
 
-		gettime(base, &tmp);
+		gettime(base, &tmp);  //??作用
 	}
 
+	// 初始化堆
 	min_heap_ctor_(&base->timeheap);
 
+	// 初始化信号的通知管道
 	base->sig.ev_signal_pair[0] = -1;
 	base->sig.ev_signal_pair[1] = -1;
+
+	// 初始化线程通知的管道
 	base->th_notify_fd[0] = -1;
 	base->th_notify_fd[1] = -1;
 
 	TAILQ_INIT(&base->active_later_queue);
 
+	// 初始化io_map
 	evmap_io_initmap_(&base->io);
+
+	// 初始化singal_map
 	evmap_signal_initmap_(&base->sigmap);
+
+	// 初始化changelist
 	event_changelist_init_(&base->changelist);
 
 	base->evbase = NULL;
@@ -1374,8 +1398,11 @@ event_signal_closure(struct event_base *base, struct event *ev)
 	}
 }
 
-/* Common timeouts are special timeouts that are handled as queues rather than
- * in the minheap.  This is more efficient than the minheap if we happen to
+/* 
+ * Common timeouts are special timeouts that are handled as queues rather than
+ * in the minheap.  
+ * 
+ * This is more efficient than the minheap if we happen to
  * know that we're going to get several thousands of timeout events all with
  * the same timeout value.
  *
@@ -2496,6 +2523,11 @@ event_get_priority(const struct event *ev)
 	return ev->ev_pri;
 }
 
+/**
+ * 将时间添加到事件循环器中
+ * @ev event
+ * @tv 超时时间
+ */ 
 int
 event_add(struct event *ev, const struct timeval *tv)
 {
@@ -2506,6 +2538,7 @@ event_add(struct event *ev, const struct timeval *tv)
 		return -1;
 	}
 
+	// 加锁
 	EVBASE_ACQUIRE_LOCK(ev->ev_base, th_base_lock);
 
 	res = event_add_nolock_(ev, tv, 0);
@@ -2609,11 +2642,15 @@ event_remove_timer(struct event *ev)
  * except: 1) it requires that we have the lock.  2) if tv_is_absolute is set,
  * we treat tv as an absolute time, not as an interval to add to the current
  * time */
+/**
+ * 
+ */ 
 int
 event_add_nolock_(struct event *ev, const struct timeval *tv,
     int tv_is_absolute)
 {
-	struct event_base *base = ev->ev_base;
+	struct event_base *base = ev->ev_base; // 获取到事件总线
+
 	int res = 0;
 	int notify = 0;
 
@@ -2666,14 +2703,17 @@ event_add_nolock_(struct event *ev, const struct timeval *tv,
 		
 		// 如果是普通的事件
 		if (ev->ev_events & (EV_READ|EV_WRITE|EV_CLOSED))
+		    // 将该事件放入到io_map中
 			res = evmap_io_add_(base, ev->ev_fd, ev);
 		// 信号事件
 		else if (ev->ev_events & EV_SIGNAL)
+		    // 将该事件放到signal_map
 			res = evmap_signal_add_(base, (int)ev->ev_fd, ev);
 
-		if (res != -1)
+		if (res != -1)  // 如果该事件放入成功了
 			// 作用是？
 			event_queue_insert_inserted(base, ev);
+
 		if (res == 1) {
 			/* evmap says we need to notify the main thread. */
 			notify = 1;

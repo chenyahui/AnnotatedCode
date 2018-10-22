@@ -36,9 +36,10 @@
 #include "util-internal.h"
 #include "mm-internal.h"
 
+// 最小堆
 typedef struct min_heap
 {
-	struct event** p; // 数组指针 event*[]
+	struct event** p; // 数组指针 event*[] 最小堆每个节点都是一个event
 	unsigned n;  // 元素个数
 	unsigned a;  // 
 } min_heap_t;
@@ -62,8 +63,11 @@ static inline void	     min_heap_shift_down_(min_heap_t* s, unsigned hole_index,
 #define min_heap_elem_greater(a, b) \
 	(evutil_timercmp(&(a)->ev_timeout, &(b)->ev_timeout, >))
 
+// 最小堆的构造函数，每个都初始化为0
 void min_heap_ctor_(min_heap_t* s) { s->p = 0; s->n = 0; s->a = 0; }
+
 void min_heap_dtor_(min_heap_t* s) { if (s->p) mm_free(s->p); }
+
 void min_heap_elem_init_(struct event* e) { e->ev_timeout_pos.min_heap_idx = -1; }
 int min_heap_empty_(min_heap_t* s) { return 0u == s->n; }
 unsigned min_heap_size_(min_heap_t* s) { return s->n; }
@@ -89,6 +93,7 @@ struct event* min_heap_pop_(min_heap_t* s)
 	return 0;
 }
 
+// 该节点是否在顶部
 int min_heap_elt_is_top_(const struct event *e)
 {
 	return e->ev_timeout_pos.min_heap_idx == 0;

@@ -52,12 +52,13 @@
 #include "mm-internal.h"
 #include "changelist-internal.h"
 
-/** An entry for an evmap_io list: notes all the events that want to read or
+/** An entry for an evmap_io list: 
+ *   notes all the events that want to read or
 	write on a given fd, and the number of each.
   */
 struct evmap_io {
 	struct event_dlist events;
-	ev_uint16_t nread;
+	ev_uint16_t nread;  //
 	ev_uint16_t nwrite;
 	ev_uint16_t nclose;
 };
@@ -74,6 +75,10 @@ struct evmap_signal {
    struct evmap_io.  But on other platforms (windows), sockets are not
    0-indexed, not necessarily consecutive, and not necessarily reused.
    There, we use a hashtable to implement evmap_io.
+
+   在一些平台上，新的fd每次0开始递增1。这个时候的map就比较简单，直接用singal_map就可以了。例如linux
+   
+   但是另外一些平台，fd是随机的大整数，例如windows，这个时候，就要用hashtable了，也就是HT。
 */
 #ifdef EVMAP_USE_HT
 struct event_map_entry {
@@ -292,6 +297,18 @@ evmap_io_add_(struct event_base *base, evutil_socket_t fd, struct event *ev)
 			return (-1);
 	}
 #endif
+
+    /**
+	 * 如果不存在的话，需要分配内存，并调动evmap_io_init初始化
+	 * 如果存在，则返回
+	 * 
+	 * ctx
+	 * io
+	 * fd
+	 * evmap_io
+	 * evmap_io_init 初始化函数
+	 * evsel->fdinfo_len
+	 */ 
 	GET_IO_SLOT_AND_CTOR(ctx, io, fd, evmap_io, evmap_io_init,
 						 evsel->fdinfo_len);
 
@@ -308,16 +325,18 @@ evmap_io_add_(struct event_base *base, evutil_socket_t fd, struct event *ev)
 
 	if (ev->ev_events & EV_READ) {
 		if (++nread == 1)
-			res |= EV_READ;
+			res |= EV_READ; //新产生的ev_read事件
 	}
+
 	if (ev->ev_events & EV_WRITE) {
-		if (++nwrite == 1)
-			res |= EV_WRITE;
+		if (++nwrite == 1) 
+			res |= EV_WRITE; // 新产生的ev_write事件
 	}
 	if (ev->ev_events & EV_CLOSED) {
 		if (++nclose == 1)
-			res |= EV_CLOSED;
+			res |= EV_CLOSED; // 新产生的close事件
 	}
+
 	if (EVUTIL_UNLIKELY(nread > 0xffff || nwrite > 0xffff || nclose > 0xffff)) {
 		event_warnx("Too many events reading or writing on fd %d",
 		    (int)fd);
@@ -331,6 +350,7 @@ evmap_io_add_(struct event_base *base, evutil_socket_t fd, struct event *ev)
 		return -1;
 	}
 
+	// 如果res不等于0，说明有新的事件加进去
 	if (res) {
 		void *extra = ((char*)ctx) + sizeof(struct evmap_io);
 		/* XXX(niels): we cannot mix edge-triggered and
@@ -345,6 +365,7 @@ evmap_io_add_(struct event_base *base, evutil_socket_t fd, struct event *ev)
 	ctx->nread = (ev_uint16_t) nread;
 	ctx->nwrite = (ev_uint16_t) nwrite;
 	ctx->nclose = (ev_uint16_t) nclose;
+	
 	LIST_INSERT_HEAD(&ctx->events, ev, ev_io_next);
 
 	return (retval);

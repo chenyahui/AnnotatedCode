@@ -219,7 +219,7 @@ struct event_base {
 	const struct eventop *evsel;
 
 	/** Pointer to backend-specific data. */
-	// 具体的平台相关的事件总线，例如epoll的就是epoll对应的数据结构 
+	// 具体的平台相关的事件总线，例如epoll的就是epoll_create返回的fd
 	void *evbase;
 
 	/** List of changes to tell backend about at next dispatch.  Only used
@@ -229,6 +229,7 @@ struct event_base {
 	/** Function pointers used to describe the backend that this event_base
 	 * uses for signals */
 	const struct eventop *evsigsel;
+
 	/** Data to implement the common signal handler code. */
 	struct evsig_info sig;
 
@@ -299,6 +300,7 @@ struct event_base {
 	struct event_signal_map sigmap;
 
 	/** Priority queue of events with timeouts. */
+	// 使用 最小堆 管理超时时间的队列
 	struct min_heap timeheap;
 
 	/** Stored timeval: used to avoid calling gettimeofday/clock_gettime
@@ -344,9 +346,12 @@ struct event_base {
 	/** True if the base already has a pending notify, and we don't need
 	 * to add any more. */
 	int is_notify_pending;
+	
 	/** A socketpair used by some th_notify functions to wake up the main
 	 * thread. */
+	// 用于线程通知的一对管道的fd
 	evutil_socket_t th_notify_fd[2];
+
 	/** An event used by some th_notify functions to wake up the main
 	 * thread. */
 	struct event th_notify;
