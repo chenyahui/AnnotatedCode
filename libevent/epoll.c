@@ -27,7 +27,7 @@
 #include "event2/event-config.h"
 #include "evconfig-private.h"
 
-#ifdef EVENT__HAVE_EPOLL
+// #ifdef EVENT__HAVE_EPOLL
 
 #include <stdint.h>
 #include <sys/types.h>
@@ -446,15 +446,17 @@ epoll_dispatch(struct event_base *base, struct timeval *tv)
 	} else
 #endif
 	if (tv != NULL) {
+		// 超时时间的转化
 		timeout = evutil_tv_to_msec_(tv);
 		if (timeout < 0 || timeout > MAX_EPOLL_TIMEOUT_MSEC) {
 			/* Linux kernels can wait forever if the timeout is
 			 * too big; see comment on MAX_EPOLL_TIMEOUT_MSEC. */
-			timeout = MAX_EPOLL_TIMEOUT_MSEC;
+			timeout = MAX_EPOLL_TIMEOUT_MSEC;  // 最大超时时间
 		}
 	}
 
 	epoll_apply_changes(base);
+
 	event_changelist_remove_all_(&base->changelist, base);
 
 	EVBASE_RELEASE_LOCK(base, th_base_lock);
@@ -537,4 +539,4 @@ epoll_dealloc(struct event_base *base)
 	mm_free(epollop);
 }
 
-#endif /* EVENT__HAVE_EPOLL */
+// #endif /* EVENT__HAVE_EPOLL */

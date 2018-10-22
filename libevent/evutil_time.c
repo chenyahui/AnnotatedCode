@@ -106,6 +106,7 @@ evutil_gettimeofday(struct timeval *tv, struct timezone *tz)
 #define MAX_SECONDS_IN_MSEC_LONG \
 	(((LONG_MAX) - 999) / 1000)
 
+// 将timeval转化为毫秒
 long
 evutil_tv_to_msec_(const struct timeval *tv)
 {

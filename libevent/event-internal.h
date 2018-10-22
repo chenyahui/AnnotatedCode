@@ -106,12 +106,15 @@ struct eventop {
 	int (*add)(struct event_base *, evutil_socket_t fd, short old, short events, void *fdinfo);
 	/** As "add", except 'events' contains the events we mean to disable. */
 	int (*del)(struct event_base *, evutil_socket_t fd, short old, short events, void *fdinfo);
+	
 	/** Function to implement the core of an event loop.  It must see which
 	    added events are ready, and cause event_active to be called for each
 	    active event (usually via event_io_active or such).  It should
 	    return 0 on success and -1 on error.
+		
 	 */
 	int (*dispatch)(struct event_base *, struct timeval *);
+
 	/** Function to clean up and free our data from the event_base. */
 	void (*dealloc)(struct event_base *);
 	/** Flag: set if we need to reinitialize the event base after we fork.
@@ -237,16 +240,20 @@ struct event_base {
 	int event_count;
 	/** Maximum number of total events added to this event_base */
 	int event_count_max;
+	
 	/** Number of total events active in this event_base */
 	int event_count_active;
+
 	/** Maximum number of total events active in this event_base */
 	int event_count_active_max;
 
 	/** Set if we should terminate the loop once we're done processing
 	 * events. */
 	int event_gotterm;
+
 	/** Set if we should terminate the loop immediately */
 	int event_break;
+
 	/** Set if we should start a new instance of the loop immediately. */
 	int event_continue;
 

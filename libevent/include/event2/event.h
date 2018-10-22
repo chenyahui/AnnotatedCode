@@ -797,9 +797,11 @@ int event_base_set(struct event_base *, struct event *);
 /** Block until we have an active event, then exit once all active events
  * have had their callbacks run. */
 #define EVLOOP_ONCE	0x01
+
 /** Do not block: see which events are ready now, run the callbacks
  * of the highest-priority ones, then exit. */
 #define EVLOOP_NONBLOCK	0x02
+
 /** Do not exit the loop because we have no pending events.  Instead, keep
  * running until event_base_loopexit() or event_base_loopbreak() makes us
  * stop.

@@ -390,10 +390,14 @@ static void event_debug_assert_not_added_(const struct event *ev) { (void)ev; }
  * to monotonic time?  Set this to -1 for 'never.' */
 #define CLOCK_SYNC_INTERVAL 5
 
-/** Set 'tp' to the current time according to 'base'.  We must hold the lock
+/**
+ * 
+ *  Set 'tp' to the current time according to 'base'.  We must hold the lock
  * on 'base'.  If there is a cached time, return it.  Otherwise, use
  * clock_gettime or gettimeofday as appropriate to find out the right time.
  * Return 0 on success, -1 on failure.
+ * 
+ * 
  */
 static int
 gettime(struct event_base *base, struct timeval *tp)
@@ -1910,7 +1914,7 @@ event_loop(int flags)
 }
 
 /**
- * 主循环
+ * 事件主循环
  */ 
 int
 event_base_loop(struct event_base *base, int flags)
@@ -1960,6 +1964,8 @@ event_base_loop(struct event_base *base, int flags)
 		}
 
 		tv_p = &tv;
+		
+		// 如果没有active的事件。并且EVLOOP_NONBLOCK是非阻塞的
 		if (!N_ACTIVE_CALLBACKS(base) && !(flags & EVLOOP_NONBLOCK)) {
 			timeout_next(base, &tv_p);
 		} else {
@@ -3155,6 +3161,7 @@ event_deferred_cb_schedule_(struct event_base *base, struct event_callback *cb)
 	return r;
 }
 
+// 指定新的超时时间
 static int
 timeout_next(struct event_base *base, struct timeval **tv_p)
 {
