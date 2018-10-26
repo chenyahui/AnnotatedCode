@@ -455,6 +455,7 @@ epoll_dispatch(struct event_base *base, struct timeval *tv)
 		}
 	}
 
+	// 应用changelist
 	epoll_apply_changes(base);
 
 	event_changelist_remove_all_(&base->changelist, base);

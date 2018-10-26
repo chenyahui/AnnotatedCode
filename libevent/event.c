@@ -1405,7 +1405,8 @@ event_signal_closure(struct event_base *base, struct event *ev)
  * This is more efficient than the minheap if we happen to
  * know that we're going to get several thousands of timeout events all with
  * the same timeout value.
- *
+ * 注意这里说的是，具有相同超时时间的，其实指的是具有相同的超时时长，并不是说这些时间在同一时刻超时
+ * 
  * Since all our timeout handling code assumes timevals can be copied,
  * assigned, etc, we can't use "magic pointer" to encode these common
  * timeouts.  Searching through a list to see if every timeout is common could
@@ -2023,7 +2024,7 @@ event_base_loop(struct event_base *base, int flags)
 			retval = -1;
 			goto done;
 		}
-
+		
 		update_time_cache(base);
 
 		timeout_process(base);
@@ -2526,7 +2527,7 @@ event_get_priority(const struct event *ev)
 /**
  * 将时间添加到事件循环器中
  * @ev event
- * @tv 超时时间
+ * @tv 超时时间 此处的时间是相对时间，即从调用event_add后的多少时间
  */ 
 int
 event_add(struct event *ev, const struct timeval *tv)
@@ -2643,7 +2644,9 @@ event_remove_timer(struct event *ev)
  * we treat tv as an absolute time, not as an interval to add to the current
  * time */
 /**
- * 
+ * @ev
+ * @tv
+ * @tv_is_absolute
  */ 
 int
 event_add_nolock_(struct event *ev, const struct timeval *tv,
@@ -3247,16 +3250,20 @@ timeout_process(struct event_base *base)
 	struct timeval now;
 	struct event *ev;
 
+	// 判断堆是否为空
 	if (min_heap_empty_(&base->timeheap)) {
 		return;
 	}
 
+	// 获取当前时间
 	gettime(base, &now);
-
+    
 	while ((ev = min_heap_top_(&base->timeheap))) {
+		
+		// 如果超时时间大于当前时间
 		if (evutil_timercmp(&ev->ev_timeout, &now, >))
 			break;
-
+		
 		/* delete this event from the I/O queues */
 		event_del_nolock_(ev, EVENT_DEL_NOBLOCK);
 
