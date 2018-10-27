@@ -392,9 +392,12 @@ static void event_debug_assert_not_added_(const struct event *ev) { (void)ev; }
 
 /**
  * 
- *  Set 'tp' to the current time according to 'base'.  We must hold the lock
- * on 'base'.  If there is a cached time, return it.  Otherwise, use
- * clock_gettime or gettimeofday as appropriate to find out the right time.
+ * Set 'tp' to the current time according to 'base'.  We must hold the lock
+ * on 'base'.  
+ * 
+ * If there is a cached time, return it.  
+ * 
+ * Otherwise, use clock_gettime or gettimeofday as appropriate to find out the right time.
  * Return 0 on success, -1 on failure.
  * 
  * 根据event_base，将tp设为当前时间
@@ -404,11 +407,13 @@ gettime(struct event_base *base, struct timeval *tp)
 {
 	EVENT_BASE_ASSERT_LOCKED(base);
 
+    // 如果cache存在，则直接返回cache
 	if (base->tv_cache.tv_sec) {
 		*tp = base->tv_cache;
 		return (0);
 	}
 
+	// 
 	if (evutil_gettime_monotonic_(&base->monotonic_timer, tp) == -1) {
 		return -1;
 	}
@@ -2012,10 +2017,12 @@ event_base_loop(struct event_base *base, int flags)
 			goto done;
 		}
 
+		// 将later事件全部激活
 		event_queue_make_later_events_active(base);
 
 		clear_time_cache(base);
-
+		
+		// 获取当前的active事件
 		res = evsel->dispatch(base, tv_p);
 
 		if (res == -1) {
@@ -2027,6 +2034,7 @@ event_base_loop(struct event_base *base, int flags)
 		
 		update_time_cache(base);
 
+		// 处理超时事件
 		timeout_process(base);
 
 		if (N_ACTIVE_CALLBACKS(base)) {
@@ -3212,7 +3220,13 @@ event_deferred_cb_schedule_(struct event_base *base, struct event_callback *cb)
 	return r;
 }
 
-// 指定新的超时时间
+/* 
+ * 得到新的指定新的超时时间, 准确来说，应该叫超时时长
+ * 
+ * @base
+ * @tv_p 这是一个out参数，新的超时时间
+ * @int 是否获取成功
+ */
 static int
 timeout_next(struct event_base *base, struct timeval **tv_p)
 {
@@ -3222,6 +3236,7 @@ timeout_next(struct event_base *base, struct timeval **tv_p)
 	struct timeval *tv = *tv_p;
 	int res = 0;
 
+	// 获取具体
 	ev = min_heap_top_(&base->timeheap);
 
 	if (ev == NULL) {
@@ -3230,16 +3245,19 @@ timeout_next(struct event_base *base, struct timeval **tv_p)
 		goto out;
 	}
 
+	// 获取当前时间
 	if (gettime(base, &now) == -1) {
 		res = -1;
 		goto out;
 	}
 
+	// 如果所有事件的最小超时时间已经比现在小了，则tv等于0
 	if (evutil_timercmp(&ev->ev_timeout, &now, <=)) {
+		// 清空tv并返回
 		evutil_timerclear(tv);
 		goto out;
 	}
-
+	// tv = ev->timeout - now
 	evutil_timersub(&ev->ev_timeout, &now, tv);
 
 	EVUTIL_ASSERT(tv->tv_sec >= 0);
@@ -3268,15 +3286,18 @@ timeout_process(struct event_base *base)
     
 	while ((ev = min_heap_top_(&base->timeheap))) {
 		
-		// 如果超时时间大于当前时间
+		// 如果超时时间大于当前时间，即超时事件在当前时间之后，因此还没超时，就退出循环
 		if (evutil_timercmp(&ev->ev_timeout, &now, >))
 			break;
 		
+		// 
 		/* delete this event from the I/O queues */
 		event_del_nolock_(ev, EVENT_DEL_NOBLOCK);
 
 		event_debug(("timeout_process: event: %p, call %p",
 			 ev, ev->ev_callback));
+
+		// 将该事件转为激活状态
 		event_active_nolock_(ev, EV_TIMEOUT, 1);
 	}
 }

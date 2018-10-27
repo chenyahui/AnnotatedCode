@@ -446,7 +446,7 @@ epoll_dispatch(struct event_base *base, struct timeval *tv)
 	} else
 #endif
 	if (tv != NULL) {
-		// 超时时间的转化
+		// 将timeval转化为long型的毫秒数
 		timeout = evutil_tv_to_msec_(tv);
 		if (timeout < 0 || timeout > MAX_EPOLL_TIMEOUT_MSEC) {
 			/* Linux kernels can wait forever if the timeout is
