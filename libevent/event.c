@@ -2786,6 +2786,8 @@ event_add_nolock_(struct event *ev, const struct timeval *tv,
 			ev->ev_timeout.tv_usec |=
 			    (tv->tv_usec & ~MICROSECONDS_MASK);
 		} else {
+			// 相当于：ev->ev_timeout = tv + now;
+			// 相当于相对时间转绝对时间
 			evutil_timeradd(&now, tv, &ev->ev_timeout);
 		}
 
@@ -2793,9 +2795,11 @@ event_add_nolock_(struct event *ev, const struct timeval *tv,
 			 "event_add: event %p, timeout in %d seconds %d useconds, call %p",
 			 ev, (int)tv->tv_sec, (int)tv->tv_usec, ev->ev_callback));
 
+// 
 #ifdef USE_REINSERT_TIMEOUT
 		event_queue_reinsert_timeout(base, ev, was_common, common_timeout, old_timeout_idx);
 #else
+      // 放入小根堆
 		event_queue_insert_timeout(base, ev);
 #endif
 
@@ -2807,8 +2811,12 @@ event_add_nolock_(struct event *ev, const struct timeval *tv,
 			}
 		} else {
 			struct event* top = NULL;
-			/* See if the earliest timeout is now earlier than it
-			 * was before: if so, we will need to tell the main
+			/* 
+			 * 如果当前的事件，比小根堆中最早的事件还早，那么
+			 * 
+			 * See if the earliest timeout is now earlier than it
+			 * was before: 
+			 * if so, we will need to tell the main
 			 * thread to wake up earlier than it would otherwise.
 			 * We double check the timeout of the top element to
 			 * handle time distortions due to system suspension.
@@ -3481,6 +3489,11 @@ event_queue_insert_active_later(struct event_base *base, struct event_callback *
 	TAILQ_INSERT_TAIL(&base->active_later_queue, evcb, evcb_active_next);
 }
 
+/**
+ * 将超时事件插入队列中
+ * 如果是common_timeout，则插入到对应的队列中
+ * 否则插入到小根堆中
+ */ 
 static void
 event_queue_insert_timeout(struct event_base *base, struct event *ev)
 {
