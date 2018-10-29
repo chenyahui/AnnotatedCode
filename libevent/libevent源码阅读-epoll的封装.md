@@ -1,10 +1,28 @@
-# 
-epoll是Linux下面io多路复用的工具，blabla
+# libevent的epoll优化
+epoll是Linux下面IO事件通知的API。
 而libevent如何使用epoll呢？
+libevent是一个跨平台的事件库，因此用了统计的接口表示了
 
 epoll说到底只有三个api：
 
+# epoll_create
+epoll_create的参数取多少？
 
+```c
+epoll_create(32000)
+```
+
+新的API
+```c
+epoll_create1(EPOLL_CLOEXEC);
+```
+
+timerfd
+
+# 
+
+# epoll 
+# changelist机制
 
 # 参考
 [从源码角度讲epoll与select的区别](https://www.cnblogs.com/apprentice89/p/3234677.html)
