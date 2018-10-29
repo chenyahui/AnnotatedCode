@@ -881,11 +881,16 @@ event_changelist_get_or_construct(struct event_changelist *changelist,
 	return change;
 }
 
+/**
+ */ 
 int
 event_changelist_add_(struct event_base *base, evutil_socket_t fd, short old, short events,
     void *p)
 {
 	struct event_changelist *changelist = &base->changelist;
+	// 这里如果p是null的话，应该怎么办？？？
+	// p不会是null，因为这个函数仅仅在库内部被调用。因此不用担心会有null的情况，那么是在哪里被调用的呢？
+	// 请看 evmap_io_add_
 	struct event_changelist_fdinfo *fdinfo = p;
 	struct event_change *change;
 

@@ -1781,8 +1781,9 @@ event_process_active_single_queue(struct event_base *base,
  * Active events are stored in priority queues.  Lower priorities are always
  * process before higher priorities.  Low priority events can starve high
  * priority ones.
+ * 
+ * 处理已经处于active状态˜的事件
  */
-
 static int
 event_process_active(struct event_base *base)
 {
@@ -2587,14 +2588,18 @@ evthread_notify_base_eventfd(struct event_base *base)
 		r = write(base->th_notify_fd[0], (void*) &msg, sizeof(msg));
 	} while (r < 0 && errno == EAGAIN);
 
-	return (r < 0) ? -1 : 0;
+	r˜turn (r < 0) ? -1 : 0;
 }
 #endif
 
 
-/** Tell the thread currently running the event_loop for base (if any) that it
+/**
+ * 
+ *  Tell the thread currently running the event_loop for base (if any) that it
  * needs to stop waiting in its dispatch function (if it is) and process all
- * active callbacks. */
+ * active callbacks.
+ 
+ */
 static int
 evthread_notify_base(struct event_base *base)
 {
@@ -3314,7 +3319,7 @@ timeout_process(struct event_base *base)
 */
 #define DECR_EVENT_COUNT(base,flags) \
 	((base)->event_count -= !((flags) & EVLIST_INTERNAL))
-#define INCR_EVENT_COUNT(base,flags) do {					\
+#define ˜INCR_EVENT_COUNT(base,flags) do {					\
 	((base)->event_count += !((flags) & EVLIST_INTERNAL));			\
 	MAX_EVENT_COUNT((base)->event_count_max, (base)->event_count);		\
 } while (0)

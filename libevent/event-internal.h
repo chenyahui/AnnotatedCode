@@ -84,7 +84,7 @@ extern "C" {
 
 /** Structure to define the backend of a given event_base. */
 /**
- * 这个类将各个平台上的事件循环的实现方法，统一的表示为这个结构体的五个方法。例如kqueue、epoll等
+ * 这个类将各个平台上的事件循环(例如kqueue、epoll等)的实现方法，统一的表示为这个结构体的五个方法
  */ 
 struct eventop {
 	/** The name of this backend. */
@@ -93,15 +93,21 @@ struct eventop {
 	 * create a new structure holding whatever information is needed to
 	 * run the backend, and return it.  The returned pointer will get
 	 * stored by event_init into the event_base.evbase field.  On failure,
-	 * this function should return NULL. */
+	 * this function should return NULL. 
+	 * 
+	 * 初始化event_base
+	 */
 	void *(*init)(struct event_base *);
-	/** Enable reading/writing on a given fd or signal.  'events' will be
-	 * the events that we're trying to enable: one or more of EV_READ,
-	 * EV_WRITE, EV_SIGNAL, and EV_ET.  'old' will be those events that
-	 * were enabled on this fd previously.  'fdinfo' will be a structure
-	 * associated with the fd by the evmap; its size is defined by the
+	/** Enable reading/writing on a given fd or signal.  
+	 * 
+	 * @ 'events' will be the events that we're trying to enable: one or more of EV_READ,
+	 * EV_WRITE, EV_SIGNAL, and EV_ET.  
+	 * @ 'old' will be those events that were enabled on this fd previously.
+	 * @ 'fdinfo' will be a structure associated with the fd by the evmap; 
+	 * its size is defined by the
 	 * fdinfo field below.  It will be set to 0 the first time the fd is
 	 * added.  The function should return 0 on success and -1 on error.
+	 * 
 	 */
 	int (*add)(struct event_base *, evutil_socket_t fd, short old, short events, void *fdinfo);
 	/** As "add", except 'events' contains the events we mean to disable. */
