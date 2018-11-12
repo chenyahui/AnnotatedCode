@@ -273,7 +273,7 @@ evmap_io_init(struct evmap_io *entry)
  * 
  * @param base 事件总线
  * @param fd   文件描述符
- * @param ev   事件
+ * @param ev   新的事件
  * @return 
  */
 int
@@ -283,7 +283,7 @@ evmap_io_add_(struct event_base *base, evutil_socket_t fd, struct event *ev)
 	struct event_io_map *io = &base->io;
 	struct evmap_io *ctx = NULL;
 	int nread, nwrite, nclose, retval = 0;
-	short res = 0, old = 0;
+	short res = 0, old = 0; // old是一个event集合，例如，old = EV_READ | EV_WRITE
 	struct event *old_ev;
 
 	EVUTIL_ASSERT(fd == ev->ev_fd);
@@ -299,6 +299,8 @@ evmap_io_add_(struct event_base *base, evutil_socket_t fd, struct event *ev)
 #endif
 
     /**
+	 * 从base->io中根据fd找到对应的event
+	 * 
 	 * 如果不存在的话，需要分配内存，并调动evmap_io_init初始化
 	 * 如果存在，则返回
 	 * 

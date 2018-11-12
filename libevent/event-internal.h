@@ -225,7 +225,7 @@ struct event_base {
 	const struct eventop *evsel;
 
 	/** Pointer to backend-specific data. */
-	// 具体的平台相关的事件总线，例如epoll的就是epoll_create返回的fd
+	// 具体的平台相关的事件总线，例如当backend是epoll的时候，evbase就是epollop
 	void *evbase;
 
 	/** List of changes to tell backend about at next dispatch.  Only used

@@ -352,6 +352,7 @@ epoll_apply_one_change(struct event_base *base,
 	return -1;
 }
 
+// 应用改变
 static int
 epoll_apply_changes(struct event_base *base)
 {
@@ -371,6 +372,7 @@ epoll_apply_changes(struct event_base *base)
 	return (r);
 }
 
+// 不使用changelist的时候的epoll_add
 static int
 epoll_nochangelist_add(struct event_base *base, evutil_socket_t fd,
     short old, short events, void *p)
@@ -379,16 +381,26 @@ epoll_nochangelist_add(struct event_base *base, evutil_socket_t fd,
 	ch.fd = fd;
 	ch.old_events = old;
 	ch.read_change = ch.write_change = ch.close_change = 0;
+
+	// 判断读写事件是否需要修改
 	if (events & EV_WRITE)
+	{
 		ch.write_change = EV_CHANGE_ADD |
 		    (events & EV_ET);
+	}
+
 	if (events & EV_READ)
+	{
 		ch.read_change = EV_CHANGE_ADD |
-		    (events & EV_ET);
+					(events & EV_ET);
+	}
+		
 	if (events & EV_CLOSED)
+	{
 		ch.close_change = EV_CHANGE_ADD |
 		    (events & EV_ET);
-
+	}
+    
 	return epoll_apply_one_change(base, base->evbase, &ch);
 }
 

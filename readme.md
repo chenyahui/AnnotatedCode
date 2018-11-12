@@ -7,3 +7,4 @@
 | libco | C++ |[注释版](https://github.com/chenyahui/annotated_code/tree/master/libco)| 暂无 | 
 | coroutine | C |[注释版](https://github.com/chenyahui/annotated_code/tree/master/coroutine)| 暂无 | 
 | libevent | C |[注释版](https://github.com/chenyahui/annotated_code/tree/master/libevent)| 暂无 |
+| sofa-rpc | C++ |[注释版](https://github.com/chenyahui/annotated_code/tree/master/sofa-rpc)| 暂无 |
