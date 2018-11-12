@@ -89,6 +89,7 @@ void SimpleRpcChannelImpl::CallMethod(const ::google::protobuf::MethodDescriptor
     if (done == NULL)
     {
         cntl->SetSync(); // null done means sync call
+        // 如果是同步的话，在这里设一个event
         cntl->SetWaitEvent(WaitEventPtr(new WaitEvent()));
     }
 
@@ -143,6 +144,7 @@ void SimpleRpcChannelImpl::CallMethod(const ::google::protobuf::MethodDescriptor
     cntl->SetRemoteEndpoint(_remote_endpoint);
     cntl->StartTimer();
     _client_impl->CallMethod(request, response, cntl);
+    // 等待cntl完成后调用signal，整个流程完成
     WaitDone(cntl);
 }
 
