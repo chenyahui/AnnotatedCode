@@ -47,8 +47,10 @@ int main()
     // Prepare parameters.
     sofa::pbrpc::RpcController* cntl = new sofa::pbrpc::RpcController();
     cntl->SetTimeout(3000);
+
     sofa::pbrpc::test::EchoRequest* request = new sofa::pbrpc::test::EchoRequest();
     request->set_message("Hello from qinzuoyan01");
+    
     sofa::pbrpc::test::EchoResponse* response = new sofa::pbrpc::test::EchoResponse();
     bool callbacked = false;
     google::protobuf::Closure* done = sofa::pbrpc::NewClosure(

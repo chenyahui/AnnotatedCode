@@ -153,6 +153,7 @@ private:
         cntl->Done(error_code, _error_message);
     }
 
+    // 接收到消息
     virtual void on_received(
             const ReadBufferPtr& message,
             int meta_size,
@@ -192,6 +193,8 @@ private:
 
         // find corresponding call handle and erase from map
         // TODO more efficient sync map
+        
+        // 根据seq_id找到上下文
         RpcControllerImplPtr cntl;
         {
             ScopedLocker<FastLock> _(_controller_map_lock);

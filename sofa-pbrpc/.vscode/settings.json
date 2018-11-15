@@ -1,5 +1,11 @@
 {
     "files.associations": {
-        "memory": "cpp"
+        "memory": "cpp",
+        "xstring": "cpp",
+        "system_error": "cpp",
+        "iosfwd": "cpp",
+        "xhash": "cpp",
+        "xtree": "cpp",
+        "xutility": "cpp"
     }
 }

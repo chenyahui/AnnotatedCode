@@ -275,6 +275,8 @@ private:
     MethodBoard* _method_boards;
 };
 
+
+// 用来注册service和查找service
 class ServicePool
 {
 public:
@@ -397,6 +399,7 @@ public:
     }
 
 private:
+    // 为了加快查找
     uint64 CacheIndex(const std::string& name)
     {
         return murmurhash(name.c_str(), name.size()) % SERVICE_CACHE_SLOT_COUNT;
