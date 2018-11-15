@@ -219,6 +219,9 @@ public:
         {
             SetFailed(error_code, reason);
 
+            // 注意： 这里是_done_callbacks是个双端队列deque，但实际上sofa-pbrpc把它当做stack用了
+            // 即，最先放进去的，最后取出来。这是因为第一个放进去的是用户定义的done，所以需要等后面的把response赋值了之后，
+            // 才能执行，因此必须最后一个执行
             while (!_done_callbacks.empty())
             {
                 const InternalDoneCallback& callback = _done_callbacks.back();
