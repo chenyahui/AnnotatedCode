@@ -60,9 +60,13 @@ void RpcRequest::CallMethod(
         }
     }
 
+    // Service()->CallMethod就是执行真正的逻辑函数，处理完之后，在里面必须调用done->Run()才可以
+    // 在done中会进行下一步的response动作
     google::protobuf::Closure* done = NewClosure(
             shared_from_this(), &RpcRequest::OnCallMethodDone,
             method_board, controller, request, response);
+
+
     cntl->SetStartProcessTime(time_now);
     stream->increase_pending_process_count();
     method_board->ReportProcessBegin();

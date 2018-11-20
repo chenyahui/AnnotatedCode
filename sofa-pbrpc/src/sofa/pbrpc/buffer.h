@@ -25,7 +25,7 @@ typedef sofa::pbrpc::shared_ptr<WriteBuffer> WriteBufferPtr;
 typedef std::deque<BufHandle> BufHandleList;
 typedef std::deque<BufHandle>::iterator BufHandleListIterator;
 typedef std::deque<BufHandle>::reverse_iterator BufHandleListReverseIterator;
-
+//配合 protobuf zero copy的实现
 class ReadBuffer : public google::protobuf::io::ZeroCopyInputStream
 {
 public:

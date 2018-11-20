@@ -10,6 +10,16 @@
 
 
 客户端异步发送后的接收回复的处理模块：RpcClientStream.on_received
+关于接收后端回复这块比较复杂，首先有个继承关系：
+RpcClientStream -> RpcMessageStream -> RpcByteStream
+
+首先 在RpcByteStream的async_read_some函数中，定义callback为on_read_some。
+
+这个on_read_some在RpcMessageStream中实现了。在这个函数里面对原始的字节消息进行了分割、处理后，才交给RpcClientStream.on_received处理。
+
+
+
+
 
 然后调用了RpcController::Done() 对结果进行处理，值得注意的是，
 
@@ -24,3 +34,13 @@
 simple_rpc_channel_impl里面会把自己的DoneCallback放进去
 
 第二个 rpc_client_impl.c里面，也会把自己的DoneCallback放进去
+
+
+
+server接收消息，交给BinaryRpcRequest::ProcessRequest进行处理
+
+
+然后调用RpcRequest::CallMethod
+封装done
+Service()->CallMethod就是执行真正的逻辑函数，处理完之后，在里面必须调用done->Run()才可以
+在done中会进行下一步的response动作
