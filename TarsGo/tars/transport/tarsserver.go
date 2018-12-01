@@ -22,6 +22,7 @@ const (
 var TLOG = rogger.GetLogger("TLOG")
 
 //TarsProtoCol is interface for handling the server side tars pacakge.
+// 这个其实命名也有点歧义。。实际上这个跟协议没啥关系，更应该是TarsServerInterface，想要基于TarServer，就实现这个interface
 type TarsProtoCol interface {
 	Invoke(ctx context.Context, pkg []byte) []byte
 	ParsePackage(buff []byte) (int, int)
@@ -36,8 +37,8 @@ type ServerHandler interface {
 
 //TarsServerConf server config for tars server side.
 type TarsServerConf struct {
-	Proto          string
-	Address        string
+	Proto          string // 协议 tcp或者udp
+	Address        string // 地址
 	MaxInvoke      int32
 	AcceptTimeout  time.Duration
 	ReadTimeout    time.Duration

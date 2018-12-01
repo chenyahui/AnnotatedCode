@@ -1,5 +1,9 @@
 package gpool
 
+/**
+* 一个协程池的实现
+ */
+
 //Worker goroutine struct.
 type Worker struct {
 	WorkerQueue chan *Worker

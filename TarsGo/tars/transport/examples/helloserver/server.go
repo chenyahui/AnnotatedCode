@@ -3,8 +3,9 @@ package main
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/TarsCloud/TarsGo/tars/transport"
 	"time"
+
+	"github.com/TarsCloud/TarsGo/tars/transport"
 )
 
 type MyServer struct{}
