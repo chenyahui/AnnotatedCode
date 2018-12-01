@@ -169,6 +169,8 @@ func Run() {
 	AddServant(adf, ad, "AdminObj")
 
 	for _, obj := range objRunList {
+
+		// http接口相关
 		if s, ok := httpSvrs[obj]; ok {
 			go func(obj string) {
 				fmt.Println(obj, "http server start")
@@ -181,6 +183,7 @@ func Run() {
 			continue
 		}
 
+		// TCP接口相关
 		s := goSvrs[obj]
 		if s == nil {
 			TLOG.Debug("Obj not found", obj)
@@ -188,6 +191,7 @@ func Run() {
 		}
 		TLOG.Debug("Run", obj, s.GetConfig())
 		go func(obj string) {
+			// 依次启动每一个TCP Server
 			err := s.Serve()
 			if err != nil {
 				fmt.Println(obj, "server start failed", err)

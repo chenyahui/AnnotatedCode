@@ -11,7 +11,9 @@ import (
 
 //AddServant add dispatch and interface for object.
 /**
-*  @ v dispatch 实际上就是application，但是定义更宽泛，dispatch的定义在tarsprotocol.go 里面，是个interface
+*  @ v dispatch 实际上就是application，但是定义更宽泛。dispatch的定义在tarsprotocol.go 里面，是个interface
+*  @ f interface{} servant
+*  @ obj string
  */
 func AddServant(v dispatch, f interface{}, obj string) {
 	addServantCommon(v, f, obj, false)
@@ -25,14 +27,20 @@ func AddServantWithContext(v dispatch, f interface{}, obj string) {
 func addServantCommon(v dispatch, f interface{}, obj string, withContext bool) {
 	// objRunList的定义在application.go里面，就是一个[]string
 	objRunList = append(objRunList, obj)
+
+	// 查找tarsConfig有没有对应的配置，tarsConfig需要在调用AddServant之前，调用tars.GetServerConfig()获取
 	cfg, ok := tarsConfig[obj]
 	if !ok {
 		TLOG.Debug("servant obj name not found ", obj)
 		return
 	}
 	TLOG.Debug("add:", cfg)
+
+	// 新建一个TCPServer
 	jp := NewTarsProtocol(v, f, withContext)
 	s := transport.NewTarsServer(jp, cfg)
+
+	// 这里是不是就意味着，每个Servant都有独立的ip和port
 	goSvrs[obj] = s
 }
 
