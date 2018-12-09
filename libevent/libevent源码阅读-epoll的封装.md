@@ -24,5 +24,6 @@ timerfd
 # epoll 
 # changelist机制
 
+实际上epoll并没有说是可以监听某个特别的事件，它只对某个fd进行事件监控。实际上是可以的，在epoll_ctl
 # 参考
 [从源码角度讲epoll与select的区别](https://www.cnblogs.com/apprentice89/p/3234677.html)
