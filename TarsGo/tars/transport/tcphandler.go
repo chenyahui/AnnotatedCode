@@ -50,10 +50,13 @@ func (h *tcpHandler) handleConn(conn *net.TCPConn, pkg []byte) {
 		remoteAddr := conn.RemoteAddr().String()
 		ipPort := strings.Split(remoteAddr, ":")
 		ctx = current.ContextWithTarsCurrent(ctx)
+
+		// 设置IP
 		ok := current.SetClientIPWithContext(ctx, ipPort[0])
 		if !ok {
 			TLOG.Error("Failed to set context with client ip")
 		}
+		// 设置端口
 		ok = current.SetClientPortWithContext(ctx, ipPort[1])
 		if !ok {
 			TLOG.Error("Failed to set context with client port")

@@ -3508,21 +3508,25 @@ evhttp_bind_socket(struct evhttp *http, const char *address, ev_uint16_t port)
 	return (0);
 }
 
+// 绑定地址以及创建监听socket，绑定listener的callback。绑定的callback为 accept_socket_cb
 struct evhttp_bound_socket *
 evhttp_bind_socket_with_handle(struct evhttp *http, const char *address, ev_uint16_t port)
 {
 	evutil_socket_t fd;
 	struct evhttp_bound_socket *bound;
 
+	// 绑定地址
 	if ((fd = bind_socket(address, port, 1 /*reuse*/)) == -1)
 		return (NULL);
-
+	
+	// 监听
 	if (listen(fd, 128) == -1) {
 		event_sock_warn(fd, "%s: listen", __func__);
 		evutil_closesocket(fd);
 		return (NULL);
 	}
 
+	// 创建监听socket，并绑定callback
 	bound = evhttp_accept_socket_with_handle(http, fd);
 
 	if (bound != NULL) {
@@ -3578,6 +3582,7 @@ evhttp_accept_socket_with_handle(struct evhttp *http, evutil_socket_t fd)
 	return (bound);
 }
 
+// 绑定socket
 struct evhttp_bound_socket *
 evhttp_bind_listener(struct evhttp *http, struct evconnlistener *listener)
 {
@@ -4403,6 +4408,7 @@ make_addrinfo(const char *address, ev_uint16_t port)
 	return (ai);
 }
 
+// 绑定socket到某个地址
 static evutil_socket_t
 bind_socket(const char *address, ev_uint16_t port, int reuse)
 {

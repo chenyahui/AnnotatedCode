@@ -2660,6 +2660,7 @@ event_remove_timer(struct event *ev)
  * @ev
  * @tv
  * @tv_is_absolute
+ * @return 
  */ 
 int
 event_add_nolock_(struct event *ev, const struct timeval *tv,

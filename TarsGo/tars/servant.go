@@ -87,7 +87,7 @@ func (s *ServantProxy) Tars_invoke(ctx context.Context, ctype byte,
 type ServantProxyFactory struct {
 	objs map[string]*ServantProxy
 	comm *Communicator
-	fm   *sync.Mutex
+	fm   *sync.Mutex // 锁
 }
 
 //Init init the  ServantProxyFactory.
@@ -100,6 +100,7 @@ func (o *ServantProxyFactory) Init(comm *Communicator) {
 //GetServantProxy gets the ServanrProxy for the object.
 func (o *ServantProxyFactory) GetServantProxy(objName string) *ServantProxy {
 	o.fm.Lock()
+	// 如果存在，则直接返回
 	if obj, ok := o.objs[objName]; ok {
 		o.fm.Unlock()
 		return obj
