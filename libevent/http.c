@@ -3519,7 +3519,7 @@ evhttp_bind_socket_with_handle(struct evhttp *http, const char *address, ev_uint
 	if ((fd = bind_socket(address, port, 1 /*reuse*/)) == -1)
 		return (NULL);
 	
-	// 监听
+	// 监听, 并设置backlog
 	if (listen(fd, 128) == -1) {
 		event_sock_warn(fd, "%s: listen", __func__);
 		evutil_closesocket(fd);
@@ -3559,6 +3559,7 @@ evhttp_foreach_bound_socket(struct evhttp *http,
 		function(bound, argument);
 }
 
+
 struct evhttp_bound_socket *
 evhttp_accept_socket_with_handle(struct evhttp *http, evutil_socket_t fd)
 {
@@ -3571,10 +3572,13 @@ evhttp_accept_socket_with_handle(struct evhttp *http, evutil_socket_t fd)
 	    flags,
 	    0, /* Backlog is '0' because we already said 'listen' */
 	    fd);
+
 	if (!listener)
 		return (NULL);
 
+	// 设置listener的callback
 	bound = evhttp_bind_listener(http, listener);
+
 	if (!bound) {
 		evconnlistener_free(listener);
 		return (NULL);
@@ -3582,7 +3586,7 @@ evhttp_accept_socket_with_handle(struct evhttp *http, evutil_socket_t fd)
 	return (bound);
 }
 
-// 绑定socket
+// 设置listener的callback, 并创建evhttp_bound_socket
 struct evhttp_bound_socket *
 evhttp_bind_listener(struct evhttp *http, struct evconnlistener *listener)
 {
@@ -3619,6 +3623,7 @@ evhttp_del_accept_socket(struct evhttp *http, struct evhttp_bound_socket *bound)
 	mm_free(bound);
 }
 
+// 创建一个http对象
 static struct evhttp*
 evhttp_new_object(void)
 {
@@ -3630,9 +3635,11 @@ evhttp_new_object(void)
 	}
 
 	evutil_timerclear(&http->timeout);
+	
 	evhttp_set_max_headers_size(http, EV_SIZE_MAX);
 	evhttp_set_max_body_size(http, EV_SIZE_MAX);
 	evhttp_set_default_content_type(http, "text/html; charset=ISO-8859-1");
+	
 	evhttp_set_allowed_methods(http,
 	    EVHTTP_REQ_GET |
 	    EVHTTP_REQ_POST |
@@ -3649,6 +3656,7 @@ evhttp_new_object(void)
 	return (http);
 }
 
+// 创建一个http对象，并设置event_base
 struct evhttp *
 evhttp_new(struct event_base *base)
 {

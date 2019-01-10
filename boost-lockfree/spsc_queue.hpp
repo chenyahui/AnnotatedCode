@@ -45,24 +45,30 @@ class ringbuffer_base
 {
 protected:
     typedef std::size_t size_t;
+    // padding_size的作用是：
     static const int padding_size = BOOST_LOCKFREE_CACHELINE_BYTES - sizeof(size_t);
-    atomic<size_t> write_index_;
     char padding1[padding_size]; /* force read_index and write_index to different cache lines */
+
+    atomic<size_t> write_index_;
     atomic<size_t> read_index_;
 
-    BOOST_DELETED_FUNCTION(ringbuffer_base(ringbuffer_base const&))
-    BOOST_DELETED_FUNCTION(ringbuffer_base& operator= (ringbuffer_base const&))
+    ringbuffer_base(ringbuffer_base const&) = delete;
+    ringbuffer_base& operator= (ringbuffer_base const&) = delete;
 
 protected:
     ringbuffer_base(void):
         write_index_(0), read_index_(0)
     {}
 
+    // 获取下一个可用的index
     static size_t next_index(size_t arg, size_t max_size)
     {
         size_t ret = arg + 1;
+
+        // 为什么不用 ret %= max_size
         while (BOOST_UNLIKELY(ret >= max_size))
             ret -= max_size;
+
         return ret;
     }
 
@@ -75,9 +81,11 @@ protected:
         return ret;
     }
 
+    // 返回可写的
     static size_t write_available(size_t write_index, size_t read_index, size_t max_size)
     {
         size_t ret = read_index - write_index - 1;
+
         if (write_index >= read_index)
             ret += max_size;
         return ret;
@@ -97,16 +105,24 @@ protected:
         return write_available(write_index, read_index, max_size);
     }
 
+    /**
+     * 将一个元素t放入队列中
+     */
     bool push(T const & t, T * buffer, size_t max_size)
     {
+        // 以memory_order_relaxed的约束读取write_index， memory_order_relaxed是为了??
         const size_t write_index = write_index_.load(memory_order_relaxed);  // only written from push thread
+
         const size_t next = next_index(write_index, max_size);
 
+        // 如果next与read_index_相等，则说明已满，这里用memory_order_acquire是为了??
         if (next == read_index_.load(memory_order_acquire))
             return false; /* ringbuffer is full */
-
+        
+        // placement new的用法
         new (buffer + write_index) T(t); // copy-construct
 
+        // 赋值write_index_
         write_index_.store(next, memory_order_release);
 
         return true;
@@ -334,8 +350,6 @@ protected:
         const size_t read_index = read_index_.load(memory_order_relaxed); // only written from pop thread
         return *(internal_buffer + read_index);
     }
-#endif
-
 
 public:
     /** reset the ringbuffer
@@ -414,6 +428,7 @@ private:
     }
 };
 
+// 编译期的ringbuffer
 template <typename T, std::size_t MaxSize>
 class compile_time_sized_ringbuffer:
     public ringbuffer_base<T>
@@ -421,6 +436,7 @@ class compile_time_sized_ringbuffer:
     typedef std::size_t size_type;
     static const std::size_t max_size = MaxSize + 1;
 
+    // aligned_storage类似于std::array, 不同的是
     typedef typename boost::aligned_storage<max_size * sizeof(T),
                                             boost::alignment_of<T>::value
                                            >::type storage_type;
@@ -512,19 +528,16 @@ public:
     }
 };
 
+// 运行时的ringbuffer
 template <typename T, typename Alloc>
 class runtime_sized_ringbuffer:
-    public ringbuffer_base<T>,
-    private Alloc
+    public ringbuffer_base<T>, private Alloc
 {
     typedef std::size_t size_type;
     size_type max_elements_;
-#ifdef BOOST_NO_CXX11_ALLOCATOR
-    typedef typename Alloc::pointer pointer;
-#else
+
     typedef std::allocator_traits<Alloc> allocator_traits;
     typedef typename allocator_traits::pointer pointer;
-#endif
     pointer array_;
 
 protected:
@@ -537,35 +550,24 @@ public:
     explicit runtime_sized_ringbuffer(size_type max_elements):
         max_elements_(max_elements + 1)
     {
-#ifdef BOOST_NO_CXX11_ALLOCATOR
-        array_ = Alloc::allocate(max_elements_);
-#else
+
         Alloc& alloc = *this;
         array_ = allocator_traits::allocate(alloc, max_elements_);
-#endif
     }
 
     template <typename U>
     runtime_sized_ringbuffer(typename detail::allocator_rebind_helper<Alloc, U>::type const & alloc, size_type max_elements):
         Alloc(alloc), max_elements_(max_elements + 1)
     {
-#ifdef BOOST_NO_CXX11_ALLOCATOR
-        array_ = Alloc::allocate(max_elements_);
-#else
         Alloc& allocator = *this;
         array_ = allocator_traits::allocate(allocator, max_elements_);
-#endif
     }
 
     runtime_sized_ringbuffer(Alloc const & alloc, size_type max_elements):
         Alloc(alloc), max_elements_(max_elements + 1)
     {
-#ifdef BOOST_NO_CXX11_ALLOCATOR
-        array_ = Alloc::allocate(max_elements_);
-#else
         Alloc& allocator = *this;
         array_ = allocator_traits::allocate(allocator, max_elements_);
-#endif
     }
 
     ~runtime_sized_ringbuffer(void)
@@ -574,12 +576,8 @@ public:
         T out;
         while (pop(&out, 1)) {}
 
-#ifdef BOOST_NO_CXX11_ALLOCATOR
-        Alloc::deallocate(array_, max_elements_);
-#else
         Alloc& allocator = *this;
         allocator_traits::deallocate(allocator, array_, max_elements_);
-#endif
     }
 
     bool push(T const & t)
@@ -650,18 +648,12 @@ public:
     }
 };
 
-#ifdef BOOST_NO_CXX11_VARIADIC_TEMPLATES
-template <typename T, typename A0, typename A1>
-#else
+
 template <typename T, typename ...Options>
-#endif
 struct make_ringbuffer
 {
-#ifdef BOOST_NO_CXX11_VARIADIC_TEMPLATES
-    typedef typename ringbuffer_signature::bind<A0, A1>::type bound_args;
-#else
+
     typedef typename ringbuffer_signature::bind<Options...>::type bound_args;
-#endif
 
     typedef extract_capacity<bound_args> extract_capacity_t;
 
@@ -671,6 +663,7 @@ struct make_ringbuffer
     typedef extract_allocator<bound_args, T> extract_allocator_t;
     typedef typename extract_allocator_t::type allocator;
 
+    // 通过用户有没有提供runtime_sized参数来选择来使用哪个类
     // allocator argument is only sane, for run-time sized ringbuffers
     BOOST_STATIC_ASSERT((mpl::if_<mpl::bool_<!runtime_sized>,
                                   mpl::bool_<!extract_allocator_t::has_allocator>,
