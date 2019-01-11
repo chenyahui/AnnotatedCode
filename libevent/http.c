@@ -1110,8 +1110,8 @@ evhttp_read_body(struct evhttp_connection *evcon, struct evhttp_request *req)
 
 /*
  * Gets called when more data becomes available
+ * http请求到达时就在这里解析request
  */
-
 static void
 evhttp_read_cb(struct bufferevent *bufev, void *arg)
 {
@@ -2338,6 +2338,7 @@ evhttp_connection_new(const char *address, ev_uint16_t port)
 	return (evhttp_connection_base_new(NULL, NULL, address, port));
 }
 
+// 创建一个buffer_event
 struct evhttp_connection *
 evhttp_connection_base_bufferevent_new(struct event_base *base, struct evdns_base *dnsbase, struct bufferevent* bev,
     const char *address, ev_uint16_t port)
@@ -2351,7 +2352,7 @@ evhttp_connection_base_bufferevent_new(struct event_base *base, struct evdns_bas
 		goto error;
 	}
 
-	evcon->fd = -1;
+	evcon->fd = -1;  // 为什么是-1
 	evcon->port = port;
 
 	evcon->max_headers_size = EV_SIZE_MAX;
@@ -2365,6 +2366,7 @@ evhttp_connection_base_bufferevent_new(struct event_base *base, struct evdns_bas
 		goto error;
 	}
 
+	// 创建一个buffer_event，但是此处为何fd为何取 -1
 	if (bev == NULL) {
 		if (!(bev = bufferevent_socket_new(base, -1, 0))) {
 			event_warn("%s: bufferevent_socket_new failed", __func__);
@@ -2372,7 +2374,9 @@ evhttp_connection_base_bufferevent_new(struct event_base *base, struct evdns_bas
 		}
 	}
 
+	// 设置callback，监听可读事件可写事件。
 	bufferevent_setcb(bev, evhttp_read_cb, evhttp_write_cb, evhttp_error_cb, evcon);
+
 	evcon->bufev = bev;
 
 	evcon->state = EVCON_DISCONNECTED;
@@ -4189,8 +4193,12 @@ struct evbuffer *evhttp_request_get_output_buffer(struct evhttp_request *req)
 /*
  * Takes a file descriptor to read a request from.
  * The callback is executed once the whole request has been read.
+ * 
+ * @http server
+ * @fd 新连接的socket
+ * @sa
+ * @salan
  */
-
 static struct evhttp_connection*
 evhttp_get_request_connection(
 	struct evhttp* http,
@@ -4214,8 +4222,11 @@ evhttp_get_request_connection(
 	if (http->bevcb != NULL) {
 		bev = (*http->bevcb)(http->base, http->bevcbarg);
 	}
+	
+	// 为该连接创建一个bufferevent，并放入event_base中
 	evcon = evhttp_connection_base_bufferevent_new(
 		http->base, NULL, bev, hostname, atoi(portname));
+
 	mm_free(hostname);
 	mm_free(portname);
 	if (evcon == NULL)
@@ -4229,11 +4240,11 @@ evhttp_get_request_connection(
 	evcon->flags |= EVHTTP_CON_INCOMING;
 	evcon->state = EVCON_READING_FIRSTLINE;
 
-	evcon->fd = fd;
+	evcon->fd = fd;		// 设置fd
 
 	bufferevent_enable(evcon->bufev, EV_READ);
 	bufferevent_disable(evcon->bufev, EV_WRITE);
-	bufferevent_setfd(evcon->bufev, fd);
+	bufferevent_setfd(evcon->bufev, fd);   // 设置fd
 	bufferevent_socket_set_conn_address_(evcon->bufev, sa, salen);
 
 	return (evcon);
@@ -4283,7 +4294,9 @@ evhttp_get_request(struct evhttp *http, evutil_socket_t fd,
 {
 	struct evhttp_connection *evcon;
 
+	// 创建新连接
 	evcon = evhttp_get_request_connection(http, fd, sa, salen);
+
 	if (evcon == NULL) {
 		event_sock_warn(fd, "%s: cannot get connection on "EV_SOCK_FMT,
 		    __func__, EV_SOCK_ARG(fd));
@@ -4300,8 +4313,11 @@ evhttp_get_request(struct evhttp *http, evutil_socket_t fd,
 	 * we need to know which http server it belongs to.
 	 */
 	evcon->http_server = http;
+
+	// 将新连接放入
 	TAILQ_INSERT_TAIL(&http->connections, evcon, next);
 
+	// 关联request handler和connection
 	if (evhttp_associate_new_request_with_connection(evcon) == -1)
 		evhttp_connection_free(evcon);
 }

@@ -423,6 +423,7 @@ listener_read_cb(evutil_socket_t fd, short what, void *p)
 			UNLOCK(lev);
 			return;
 		}
+		
 		++lev->refcnt;
 		cb = lev->cb;
 		user_data = lev->user_data;
