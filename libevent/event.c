@@ -2281,6 +2281,7 @@ event_free(struct event *ev)
 
 	/* make sure that this event won't be coming back to haunt us. */
 	event_del(ev);
+	
 	event_debug_note_teardown_(ev);
 	mm_free(ev);
 
@@ -2556,7 +2557,7 @@ event_add(struct event *ev, const struct timeval *tv)
 	EVBASE_RELEASE_LOCK(ev->ev_base, th_base_lock);
 
 	return (res);
-}
+}˜
 
 /* Helper callback: wake an event_base from another thread.  This version
  * works by writing a byte to one end of a socketpair, so that the event_base
