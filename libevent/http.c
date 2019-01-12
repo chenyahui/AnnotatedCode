@@ -1110,6 +1110,7 @@ evhttp_read_body(struct evhttp_connection *evcon, struct evhttp_request *req)
 
 /*
  * Gets called when more data becomes available
+ * ev_conn的buffer_event的可读事件触发的callback
  * http请求到达时就在这里解析request
  */
 static void
@@ -2338,7 +2339,12 @@ evhttp_connection_new(const char *address, ev_uint16_t port)
 	return (evhttp_connection_base_new(NULL, NULL, address, port));
 }
 
-// 创建一个buffer_event
+/**
+ * 新建一个connection对象并且检查该连接的bufferevent之前有没有被bev_cb初始化, 
+ * 没有的话，自己创建一个
+ * 同时设置了buffer_event的可读、可写、错误的callback分别为
+ * evhttp_read_cb, evhttp_write_cb, evhttp_error_cb
+ */ 
 struct evhttp_connection *
 evhttp_connection_base_bufferevent_new(struct event_base *base, struct evdns_base *dnsbase, struct bufferevent* bev,
     const char *address, ev_uint16_t port)
@@ -3288,6 +3294,7 @@ evhttp_parse_query_str(const char *uri, struct evkeyvalq *headers)
 	return evhttp_parse_query_impl(uri, headers, 0);
 }
 
+// 一个router的效果，就是找到对应的callback
 static struct evhttp_cb *
 evhttp_dispatch_callback(struct httpcbq *callbacks, struct evhttp_request *req)
 {
@@ -3428,6 +3435,7 @@ evhttp_handle_request(struct evhttp_request *req, void *arg)
 	/* we have a new request on which the user needs to take action */
 	req->userdone = 0;
 
+	// 暂时禁用掉EV_READ事件，以保证input_buffer中的是一个完成的request
 	bufferevent_disable(req->evcon->bufev, EV_READ);
 
 	if (req->type == 0 || req->uri == NULL) {
@@ -3448,11 +3456,13 @@ evhttp_handle_request(struct evhttp_request *req, void *arg)
 		evhttp_find_vhost(http, &http, hostname);
 	}
 
+	// 如果找到了callback，就使用专门的callback
 	if ((cb = evhttp_dispatch_callback(&http->callbacks, req)) != NULL) {
 		(*cb->cb)(req, cb->cbarg);
 		return;
 	}
 
+	// 如果没找到，就使用通用的callback
 	/* Generic call back */
 	if (http->gencb) {
 		(*http->gencb)(req, http->gencbarg);
@@ -3519,7 +3529,7 @@ evhttp_bind_socket_with_handle(struct evhttp *http, const char *address, ev_uint
 	evutil_socket_t fd;
 	struct evhttp_bound_socket *bound;
 
-	// 绑定地址
+	// 创建监听socket
 	if ((fd = bind_socket(address, port, 1 /*reuse*/)) == -1)
 		return (NULL);
 	
@@ -3564,6 +3574,10 @@ evhttp_foreach_bound_socket(struct evhttp *http,
 }
 
 
+/* 
+ * 1. 建立listen的event
+ * 2. 设置callback
+*/
 struct evhttp_bound_socket *
 evhttp_accept_socket_with_handle(struct evhttp *http, evutil_socket_t fd)
 {
@@ -3571,7 +3585,8 @@ evhttp_accept_socket_with_handle(struct evhttp *http, evutil_socket_t fd)
 	struct evconnlistener *listener;
 	const int flags =
 	    LEV_OPT_REUSEABLE|LEV_OPT_CLOSE_ON_EXEC|LEV_OPT_CLOSE_ON_FREE;
-
+	
+	// 新建event
 	listener = evconnlistener_new(http->base, NULL, NULL,
 	    flags,
 	    0, /* Backlog is '0' because we already said 'listen' */
@@ -3580,7 +3595,7 @@ evhttp_accept_socket_with_handle(struct evhttp *http, evutil_socket_t fd)
 	if (!listener)
 		return (NULL);
 
-	// 设置listener的callback
+	// 设置listener的callback，其callback为accept_socket_cb
 	bound = evhttp_bind_listener(http, listener);
 
 	if (!bound) {
@@ -3952,6 +3967,8 @@ evhttp_set_newreqcb(struct evhttp *http,
 
 /*
  * Request related functions
+ * 1. 新建一个request对象
+ * 2. 设置req->cb = cb
  */
 
 struct evhttp_request *
@@ -4223,7 +4240,8 @@ evhttp_get_request_connection(
 		bev = (*http->bevcb)(http->base, http->bevcbarg);
 	}
 	
-	// 为该连接创建一个bufferevent，并放入event_base中
+	// 新建一个connection对象并且检查该连接的bufferevent之前有没有被bev_cb初始化, 
+    // 没有的话，自己创建一个
 	evcon = evhttp_connection_base_bufferevent_new(
 		http->base, NULL, bev, hostname, atoi(portname));
 
@@ -4237,12 +4255,15 @@ evhttp_get_request_connection(
 	if (http->flags & EVHTTP_SERVER_LINGERING_CLOSE)
 		evcon->flags |= EVHTTP_CON_LINGERING_CLOSE;
 
+	// 将该连接标注为 incoming
 	evcon->flags |= EVHTTP_CON_INCOMING;
 	evcon->state = EVCON_READING_FIRSTLINE;
 
 	evcon->fd = fd;		// 设置fd
 
-	bufferevent_enable(evcon->bufev, EV_READ);
+    // 打开该event的可读事件
+	bufferevent_enable(evcon->bufev, EV_READ); 
+	// 禁用该event的可写事件：为什么要禁用呢？为了性能，只有当需要写的时候才打开
 	bufferevent_disable(evcon->bufev, EV_WRITE);
 	bufferevent_setfd(evcon->bufev, fd);   // 设置fd
 	bufferevent_socket_set_conn_address_(evcon->bufev, sa, salen);
@@ -4250,6 +4271,12 @@ evhttp_get_request_connection(
 	return (evcon);
 }
 
+/**
+ * 1. 新建一个requset
+ * 2. 关联这个request和conn
+ * 3. 把request放到conn的requests队列中
+ * 4. 开始读conn的input buffer
+ */ 
 static int
 evhttp_associate_new_request_with_connection(struct evhttp_connection *evcon)
 {
@@ -4288,6 +4315,10 @@ evhttp_associate_new_request_with_connection(struct evhttp_connection *evcon)
 	return (0);
 }
 
+
+/**
+ * 当有新的连接的时候会触发调用这个函数
+ */ 
 static void
 evhttp_get_request(struct evhttp *http, evutil_socket_t fd,
     struct sockaddr *sa, ev_socklen_t salen)
@@ -4314,7 +4345,7 @@ evhttp_get_request(struct evhttp *http, evutil_socket_t fd,
 	 */
 	evcon->http_server = http;
 
-	// 将新连接放入
+	// 将新连接放入 server的连接队列中
 	TAILQ_INSERT_TAIL(&http->connections, evcon, next);
 
 	// 关联request handler和connection

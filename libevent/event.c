@@ -192,7 +192,7 @@ hash_debug_entry(const struct event_debug_entry *e)
 	return (u >> 6);
 }
 
-static inline int
+˜static inline int
 eq_debug_entry(const struct event_debug_entry *a,
     const struct event_debug_entry *b)
 {
@@ -1949,6 +1949,8 @@ event_loop(int flags)
 
 /**
  * 事件主循环
+ * @base 事件总线
+ * @flag 目前取值是这三种宏的或：EVLOOP_ONCE、EVLOOP_NONBLOCK、EVLOOP_NO_EXIT_ON_EMPTY
  */ 
 int
 event_base_loop(struct event_base *base, int flags)
@@ -3697,7 +3699,7 @@ evthread_notify_drain_eventfd(evutil_socket_t fd, short what, void *arg)
 	ev_ssize_t r;
 	struct event_base *base = arg;
 
-	r = read(fd, (void*) &msg, sizeof(msg));
+	r = read(fd, (void*) &msg, s˜izeof(msg));
 	if (r<0 && errno != EAGAIN) {
 		event_sock_warn(fd, "Error reading from eventfd");
 	}
