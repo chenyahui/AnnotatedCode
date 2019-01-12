@@ -204,6 +204,7 @@ send_document_cb(struct evhttp_request *req, void *arg)
 		perror("malloc");
 		goto err;
 	}
+	
 	evutil_snprintf(whole_path, len, "%s/%s", docroot, decoded_path);
 
 	if (stat(whole_path, &st)<0) {

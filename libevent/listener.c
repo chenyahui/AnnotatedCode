@@ -152,6 +152,15 @@ static const struct evconnlistener_ops evconnlistener_event_ops = {
 
 static void listener_read_cb(evutil_socket_t, short, void *);
 
+/* 
+ * 创建一个listener
+ * @base
+ * @cb
+ * @ptr
+ * @flags
+ * @backlog
+ * @fd
+ */
 struct evconnlistener *
 evconnlistener_new(struct event_base *base,
     evconnlistener_cb cb, void *ptr, unsigned flags, int backlog,
@@ -384,6 +393,7 @@ evconnlistener_set_error_cb(struct evconnlistener *lev,
 	UNLOCK(lev);
 }
 
+// listen的callback
 static void
 listener_read_cb(evutil_socket_t fd, short what, void *p)
 {
@@ -396,7 +406,9 @@ listener_read_cb(evutil_socket_t fd, short what, void *p)
 	while (1) {
 		struct sockaddr_storage ss;
 		ev_socklen_t socklen = sizeof(ss);
+		// accept
 		evutil_socket_t new_fd = evutil_accept4_(fd, (struct sockaddr*)&ss, &socklen, lev->accept4_flags);
+		
 		if (new_fd < 0)
 			break;
 		if (socklen == 0) {
@@ -411,12 +423,16 @@ listener_read_cb(evutil_socket_t fd, short what, void *p)
 			UNLOCK(lev);
 			return;
 		}
+		
 		++lev->refcnt;
 		cb = lev->cb;
 		user_data = lev->user_data;
 		UNLOCK(lev);
+
+		// 执行用户设定的callback
 		cb(lev, new_fd, (struct sockaddr*)&ss, (int)socklen,
 		    user_data);
+
 		LOCK(lev);
 		if (lev->refcnt == 1) {
 			int freed = listener_decref_and_unlock(lev);

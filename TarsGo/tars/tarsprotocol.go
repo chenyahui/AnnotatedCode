@@ -32,6 +32,10 @@ func NewTarsProtocol(dispatcher dispatch, imp interface{}, withContext bool) *Ta
 }
 
 //Invoke puts the request as []byte and call the dispather, and then return the response as []byte.
+/**
+* @param ctx context 包含了上下文数据， 其数据主要是在tarcurrent.go中定义的Current对象
+* @param req req []byte
+ */
 func (s *TarsProtocol) Invoke(ctx context.Context, req []byte) (rsp []byte) {
 	defer checkPanic()
 

@@ -11,7 +11,7 @@ import (
 
 //AddServant add dispatch and interface for object.
 /**
-*  @ v dispatch 实际上就是application，但是定义更宽泛。dispatch的定义在tarsprotocol.go 里面，是个interface
+*  @ v dispatch 实际上就是application，但是定义更宽泛，可能是client或者server。dispatch的定义在tarsprotocol.go 里面，是个interface。
 *  @ f interface{} servant
 *  @ obj string
  */
