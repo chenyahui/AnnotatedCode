@@ -54,3 +54,12 @@ evhttp_connection_done：
 evhttp_handle_request就是正常的router过程
 
 evhttp_send_reply : 回复
+    evhttp_send
+    evhttp_make_header写到buffer里面
+    evhttp_write_buffer(evcon, evhttp_send_done, NULL): buffer写完后会调用evhttp_send_done
+    evhttp_send_done:
+    1. 调用req->on_complete_cb
+	2. evhttp_request_free(req);
+    3. 检测conn是否应该释放
+
+    ?? 怎么把用户传的databuf和evcon的evbuffer连接起来的？？

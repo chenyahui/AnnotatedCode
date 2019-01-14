@@ -3699,7 +3699,7 @@ evthread_notify_drain_eventfd(evutil_socket_t fd, short what, void *arg)
 	ev_ssize_t r;
 	struct event_base *base = arg;
 
-	r = read(fd, (void*) &msg, s˜izeof(msg));
+	r = read(fd, (void*) &msg, sizeof(msg));
 	if (r<0 && errno != EAGAIN) {
 		event_sock_warn(fd, "Error reading from eventfd");
 	}

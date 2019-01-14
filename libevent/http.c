@@ -1297,7 +1297,8 @@ evhttp_request_dispatch(struct evhttp_connection* evcon)
 
 	evcon->state = EVCON_WRITING;
 
-	/* Create the header from the store arguments */
+	/* Create the header
+	 from the store arguments */
 	evhttp_make_header(evcon, req);
 
 	evhttp_write_buffer(evcon, evhttp_write_connectioncb, NULL);
@@ -2814,7 +2815,7 @@ evhttp_send(struct evhttp_request *req, struct evbuffer *databuf)
 	if (databuf != NULL)
 		evbuffer_add_buffer(req->output_buffer, databuf);
 
-	/* Adds headers to the response */
+	/* Adds headers to the response , 同时也把req->output_buffer写进去了*/
 	evhttp_make_header(evcon, req);
 
 	evhttp_write_buffer(evcon, evhttp_send_done, NULL);
