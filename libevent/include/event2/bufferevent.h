@@ -43,8 +43,11 @@
   Once initialized, the bufferevent structure can be used repeatedly
   with bufferevent_enable() and bufferevent_disable().
 
+  // 当启用reading的时候
   When reading is enabled, the bufferevent will try to read from the
   file descriptor onto its input buffer, and call the read callback.
+
+  // 当启用writing的时候
   When writing is enabled, the bufferevent will try to write data onto its
   file descriptor when the output buffer has enough data, and call the write
   callback when the output buffer is sufficiently drained.
