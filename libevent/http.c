@@ -371,6 +371,8 @@ evhttp_write_buffer(struct evhttp_connection *evcon,
 	/* Disable the read callback: we don't actually care about data;
 	 * we only care about close detection. (We don't disable reading --
 	 * EV_READ, since we *do* want to learn about any close events.) */
+
+	// 开启READ事件，但是不进行回调
 	bufferevent_setcb(evcon->bufev,
 	    NULL, /*read*/
 	    evhttp_write_cb,
