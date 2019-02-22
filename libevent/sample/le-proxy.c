@@ -235,7 +235,7 @@ main(int argc, char **argv)
 
 	memset(&listen_on_addr, 0, sizeof(listen_on_addr));
 	socklen = sizeof(listen_on_addr);
-	if (evutil_parse_sockaddr_port(argv[i],
+	if (s(argv[i],
 		(struct sockaddr*)&listen_on_addr, &socklen)<0) {
 		int p = atoi(argv[i]);
 		struct sockaddr_in *sin = (struct sockaddr_in*)&listen_on_addr;
