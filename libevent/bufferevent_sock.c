@@ -346,6 +346,7 @@ bufferevent_writecb(evutil_socket_t fd, short event, void *arg)
 	bufferevent_decref_and_unlock_(bufev);
 }
 
+// 新建socket的一个bufferevent
 struct bufferevent *
 bufferevent_socket_new(struct event_base *base, evutil_socket_t fd,
     int options)
@@ -371,6 +372,7 @@ bufferevent_socket_new(struct event_base *base, evutil_socket_t fd,
 
 	event_assign(&bufev->ev_read, bufev->ev_base, fd,
 	    EV_READ|EV_PERSIST|EV_FINALIZE, bufferevent_readcb, bufev);
+		
 	event_assign(&bufev->ev_write, bufev->ev_base, fd,
 	    EV_WRITE|EV_PERSIST|EV_FINALIZE, bufferevent_writecb, bufev);
 
@@ -585,7 +587,7 @@ be_socket_enable(struct bufferevent *bufev, short event)
 			return -1;
 	return 0;
 }
-
+// disable的时候直接删除
 static int
 be_socket_disable(struct bufferevent *bufev, short event)
 {
