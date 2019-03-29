@@ -369,6 +369,7 @@ bufferevent_socket_new(struct event_base *base, evutil_socket_t fd,
 	bufev = &bufev_p->bev;
 	evbuffer_set_flags(bufev->output, EVBUFFER_FLAG_DRAINS_TO_FD);
 
+	// 这里可以看到，实际上bufferevent对应两个event，一个read 一个write
 	event_assign(&bufev->ev_read, bufev->ev_base, fd,
 	    EV_READ|EV_PERSIST|EV_FINALIZE, bufferevent_readcb, bufev);
 	event_assign(&bufev->ev_write, bufev->ev_base, fd,

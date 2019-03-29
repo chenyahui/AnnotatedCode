@@ -197,6 +197,8 @@ evconnlistener_new(struct event_base *base,
 	lev->base.refcnt = 1;
 
 	lev->base.accept4_flags = 0;
+
+	// 如果用户没有强行设置LEV_OPT_LEAVE_SOCKETS_BLOCKING，则默认设置EVUTIL_SOCK_NONBLOCK
 	if (!(flags & LEV_OPT_LEAVE_SOCKETS_BLOCKING))
 		lev->base.accept4_flags |= EVUTIL_SOCK_NONBLOCK;
 	if (flags & LEV_OPT_CLOSE_ON_EXEC)
@@ -209,6 +211,7 @@ evconnlistener_new(struct event_base *base,
 	event_assign(&lev->listener, base, fd, EV_READ|EV_PERSIST,
 	    listener_read_cb, lev);
 
+	// 如果用户没有强行设置LEV_OPT_DISABLED，则默认enable listener
 	if (!(flags & LEV_OPT_DISABLED))
 	    evconnlistener_enable(&lev->base);
 
@@ -393,7 +396,7 @@ evconnlistener_set_error_cb(struct evconnlistener *lev,
 	UNLOCK(lev);
 }
 
-// listen的callback
+// listener的callback
 static void
 listener_read_cb(evutil_socket_t fd, short what, void *p)
 {

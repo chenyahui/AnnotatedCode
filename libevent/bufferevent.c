@@ -582,7 +582,6 @@ bufferevent_setwatermark(struct bufferevent *bufev, short events,
 	if (events & EV_READ) {
 		bufev->wm_read.low = lowmark;
 		bufev->wm_read.high = highmark;
-
 		if (highmark) {
 			/* There is now a new high-water mark for read.
 			   enable the callback if needed, and see if we should

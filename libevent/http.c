@@ -4242,7 +4242,6 @@ evhttp_get_request_connection(
 	}
 	
 	// 新建一个connection对象并且检查该连接的bufferevent之前有没有被bev_cb初始化, 
-    // 没有的话，自己创建一个
 	evcon = evhttp_connection_base_bufferevent_new(
 		http->base, NULL, bev, hostname, atoi(portname));
 
