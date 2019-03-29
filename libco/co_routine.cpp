@@ -53,14 +53,17 @@ struct stCoEpoll_t;
 */
 struct stCoRoutineEnv_t
 {
-	stCoRoutine_t *pCallStack[ 128 ]; // 当前线程中包含的协程
+	stCoRoutine_t *pCallStack[ 128 ]; // 当前线程中管理的协程， 最后一位是当前正在运行的那个协程，实际上相当于是个栈
+
 	int iCallStackSize; //记录当前一共创建了多少个协程
+
 	stCoEpoll_t *pEpoll;  //主要是epoll，作为协程的调度器
 
 	//for copy stack log lastco and nextco
 	stCoRoutine_t* pending_co;  
 	stCoRoutine_t* occupy_co;
 };
+
 //int socket(int domain, int type, int protocol);
 void co_log_err( const char *fmt,... )
 {
@@ -339,7 +342,6 @@ struct stCoEpoll_t
 	struct stTimeoutItemLink_t *pstActiveList; // 正在处理的事件
 
 	co_epoll_res *result; 
-
 };
 typedef void (*OnPreparePfn_t)( stTimeoutItem_t *,struct epoll_event &ev, stTimeoutItemLink_t *active );
 typedef void (*OnProcessPfn_t)( stTimeoutItem_t *);
@@ -595,7 +597,8 @@ struct stCoRoutine_t *co_create_env( stCoRoutineEnv_t * env, const stCoRoutineAt
 }
 
 /**
-* 创建一个协程
+* 创建一个协程对象
+* 
 * @param ppco - (output) 协程的地址，未初始化，需要在此函数中将其申请内存空间以及初始化工作
 * @param attr - (input) 协程属性，目前主要是共享栈 
 * @param pfn - (input) 协程所运行的函数
@@ -610,10 +613,13 @@ int co_create( stCoRoutine_t **ppco,const stCoRoutineAttr_t *attr,pfn_co_routine
 		co_init_curr_thread_env();
 	}
 
+	// 根据协程的运行环境，来创建一个协程
 	stCoRoutine_t *co = co_create_env( co_get_curr_thread_env(), attr, pfn,arg );
+
 	*ppco = co;
 	return 0;
 }
+
 void co_free( stCoRoutine_t *co )
 {
     if (!co->cIsShareStack) 
@@ -644,16 +650,16 @@ void co_resume( stCoRoutine_t *co )
 
 	if( !co->cStart )
 	{
-		// 如果当前协程还没有开始运行，为其设计环境设计环境
+		// 如果当前协程还没有开始运行，为其构建上下文
 		coctx_make( &co->ctx,(coctx_pfn_t)CoRoutineFunc,co,0 );
 		co->cStart = 1;
 	}
 	// 将当前协程放入线程的协程队列末尾
 	env->pCallStack[ env->iCallStackSize++ ] = co;
 	
-	// 将当前运行的上下文放入lpCurrRoutine中，同时将新线程的上下文替换进去
+	// 将当前运行的上下文保存到lpCurrRoutine中，同时将协程co的上下文替换进去
+	// 执行完这一句，当前的运行环境就被替换为 co 了
 	co_swap( lpCurrRoutine, co );
-
 }
 
 /*
@@ -704,7 +710,8 @@ void save_stack_buffer(stCoRoutine_t* occupy_co)
 }
 
 /*
-* 将当前栈内容保存到curr中，并将pending_co
+* 将当前栈内容保存到curr中，并替换为pending_co中的上下文
+
 * @param curr
 * @param pending_co 
 */
@@ -836,15 +843,18 @@ void co_init_curr_thread_env()
 	// 当前协程数为0
 	env->iCallStackSize = 0;
     
+	// 创建一个协程
 	struct stCoRoutine_t *self = co_create_env( env, NULL, NULL,NULL );
 	
-	self->cIsMain = 1;
+	self->cIsMain = 1;	// 标识是一个主协程
 
-	env->pending_co = NULL;
-	env->occupy_co = NULL;
+	env->pending_co = NULL; // 初始化为 null
+	env->occupy_co = NULL;  // 初始化为 null
 
+	// 初始化协程上下文
 	coctx_init( &self->ctx );
 
+	// 初始化协程管理器的时候，会把主协程放在第一个
 	env->pCallStack[ env->iCallStackSize++ ] = self;
 
 	stCoEpoll_t *ev = AllocEpoll();
@@ -896,7 +906,7 @@ void co_eventloop( stCoEpoll_t *ctx,pfn_co_eventloop_t pfn,void *arg )
 {
 	if( !ctx->result )
 	{
-		ctx->result =  co_epoll_res_alloc( stCoEpoll_t::_EPOLL_SIZE );
+		ctx->result = co_epoll_res_alloc( stCoEpoll_t::_EPOLL_SIZE );
 	}
 	co_epoll_res *result = ctx->result;
 
@@ -1118,6 +1128,8 @@ int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeou
 	arg.ullExpireTime = now + timeout;
 	// 将其添加到超时链表中
 	int ret = AddTimeout( ctx->pTimeout,&arg,now );
+
+	// 如果出错了
 	if( ret != 0 )
 	{
 		co_log_err("CO_ERR: AddTimeout ret %d now %lld timeout %d arg.ullExpireTime %lld",
@@ -1135,7 +1147,7 @@ int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeou
 		return -__LINE__;
 	}
 
-	// 让出CPU
+	// 把让出CPU
 	co_yield_env( co_get_curr_thread_env() );
 
 	RemoveFromLink<stTimeoutItem_t,stTimeoutItemLink_t>( &arg );
@@ -1184,6 +1196,7 @@ stCoEpoll_t *co_get_epoll_ct()
 	}
 	return co_get_curr_thread_env()->pEpoll;
 }
+
 struct stHookPThreadSpec_t
 {
 	stCoRoutine_t *co;

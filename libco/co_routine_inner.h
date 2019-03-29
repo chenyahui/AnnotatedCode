@@ -54,7 +54,7 @@ struct stShareStack_t
 //协程
 struct stCoRoutine_t
 {
-	stCoRoutineEnv_t *env;  
+	stCoRoutineEnv_t *env;  // 协程所在的运行环境，可以理解为，该协程所属的协程管理器
 	pfn_co_routine_t pfn;
 	void *arg; // 函数参数
 	coctx_t ctx; // 协程上下文
@@ -62,8 +62,8 @@ struct stCoRoutine_t
 	char cStart;          // 是否已经开始运行了
 	char cEnd;            // 是否已经结束
 	char cIsMain;         // 是否是主协程
-	char cEnableSysHook; //是否要打开钩子标识
-	char cIsShareStack;  //是否要采用共享栈
+	char cEnableSysHook;  //是否要打开钩子标识
+	char cIsShareStack;   //是否要采用共享栈
 
 	void *pvEnv;
 

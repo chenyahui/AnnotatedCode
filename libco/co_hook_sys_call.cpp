@@ -65,7 +65,7 @@ static inline pid_t GetPid()
 	return p ? *(pid_t*)(p + 18) : getpid();
 }
 
-// 全局数组
+// 全局数组，每个fd对应的上下文信息
 static rpchook_t *g_rpchook_socket_fd[ 102400 ] = { 0 };
 
 typedef int (*socket_pfn_t)(int domain, int type, int protocol);
@@ -341,13 +341,13 @@ ssize_t read( int fd, void *buf, size_t nbyte )
 	{
 		return g_sys_read_func( fd,buf,nbyte );
 	}
+
 	// 根据fd，从一个全局数组中取出其对应的信息。需要提醒的是，该fd会在accept函数或者socket函数时，将其fd放入数组
 	rpchook_t *lp = get_by_fd( fd );
 
-
+	// 如果该fd没有提前放入到数组中，或者该fd本身就是非阻塞的了，则直接执行
 	if( !lp || ( O_NONBLOCK & lp->user_flag ) ) 
 	{
-	    // 如果该fd没有提前放入到数组中，或者该fd本身就是非阻塞的了，则直接执行
 		ssize_t ret = g_sys_read_func( fd,buf,nbyte );
 		return ret;
 	}
@@ -361,6 +361,7 @@ ssize_t read( int fd, void *buf, size_t nbyte )
 	pf.fd = fd;
 	pf.events = ( POLLIN | POLLERR | POLLHUP );
 
+	// 最终会调用, co_poll_inner ，将其注册到epoll中
 	int pollret = poll( &pf,1,timeout );
 
 	ssize_t readret = g_sys_read_func( fd,(char*)buf ,nbyte );

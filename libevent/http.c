@@ -371,6 +371,8 @@ evhttp_write_buffer(struct evhttp_connection *evcon,
 	/* Disable the read callback: we don't actually care about data;
 	 * we only care about close detection. (We don't disable reading --
 	 * EV_READ, since we *do* want to learn about any close events.) */
+
+	// 开启READ事件，但是不进行回调
 	bufferevent_setcb(evcon->bufev,
 	    NULL, /*read*/
 	    evhttp_write_cb,
@@ -2373,7 +2375,7 @@ evhttp_connection_base_bufferevent_new(struct event_base *base, struct evdns_bas
 		goto error;
 	}
 
-	// 创建一个buffer_event，但是此处为何fd为何取 -1
+	// 创建一个buffer_event，这个函数是通用的，即给client用，也给server用，二者生成的逻辑是不一样的
 	if (bev == NULL) {
 		if (!(bev = bufferevent_socket_new(base, -1, 0))) {
 			event_warn("%s: bufferevent_socket_new failed", __func__);
