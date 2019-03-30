@@ -43,19 +43,27 @@ void* RoutineFunc(void* args)
 	while (true)
 	{
 		printf("%s:%d routine specific data idx %d\n", __func__, __LINE__, __routine->idx);
+
+		// poll会将该超时事件注册到eventloop中，同时调用yield
 		poll(NULL, 0, 1000);
 	}
 	return NULL;
 }
+
 int main()
 {
 	stRoutineArgs_t args[10];
+
 	for (int i = 0; i < 10; i++)
 	{
 		args[i].routine_id = i;
 		co_create(&args[i].co, NULL, RoutineFunc, (void*)&args[i]);
+
+		// resume之后，会将当前运行环境切换为该协程
 		co_resume(args[i].co);
 	}
+	// 10个协程全都resume、yield了一遍完之后，开始在主线程开启event_loop
+
 	co_eventloop(co_get_epoll_ct(), NULL, NULL);
 	return 0;
 }

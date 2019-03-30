@@ -41,6 +41,7 @@
 
 extern "C"
 {
+	// 保存当前上下文到第一个参数，并激活第二个参数的上下文
 	extern void coctx_swap( coctx_t *,coctx_t* ) asm("coctx_swap");
 };
 using namespace std;
@@ -637,8 +638,8 @@ void co_release( stCoRoutine_t *co )
 void co_swap(stCoRoutine_t* curr, stCoRoutine_t* pending_co);
 
 /*
-* 继续运行协程
-* 
+* 语义：继续运行协程
+* 实际上：
 * @param co - (input) 要切换的协程
 */
 void co_resume( stCoRoutine_t *co )
@@ -663,18 +664,24 @@ void co_resume( stCoRoutine_t *co )
 }
 
 /*
+*
 * 主动将协程让给其他协程
 *
 * @param env 协程管理器 
 */
 void co_yield_env( stCoRoutineEnv_t *env )
 {
-	
+	// 这里可以很清楚的看到，
 	stCoRoutine_t *last = env->pCallStack[ env->iCallStackSize - 2 ];
+
+	// 当前栈
 	stCoRoutine_t *curr = env->pCallStack[ env->iCallStackSize - 1 ];
 
 	env->iCallStackSize--;
 
+	// 把上下文当前的存储到curr中，并激活last的上下文
+	// 此时，last成为了队列尾部
+	// 问题来了，curr啥时候再回来继续运行呢？
 	co_swap( curr, last);
 }
 
@@ -710,7 +717,9 @@ void save_stack_buffer(stCoRoutine_t* occupy_co)
 }
 
 /*
-* 将当前栈内容保存到curr中，并替换为pending_co中的上下文
+* 1. 将当前的运行上下文保存到curr中
+* 2. 将当前的运行上下文替换为pending_co中的上下文
+* 3. curr的上下文呢？
 
 * @param curr
 * @param pending_co 
@@ -720,19 +729,19 @@ void co_swap(stCoRoutine_t* curr, stCoRoutine_t* pending_co)
  	stCoRoutineEnv_t* env = co_get_curr_thread_env();
 
 	//get curr stack sp
-	// 这个c变量的实现，作用是为了找到目前的栈底，因为c变量是最后一个放入栈中的内容。
+	//这里非常重要!!!： 这个c变量的实现，作用是为了找到目前的栈底，因为c变量是最后一个放入栈中的内容。
 	char c;
 	curr->stack_sp= &c;
 
 	if (!pending_co->cIsShareStack)
-	{  // 如果没有采用共享栈
-		
+	{  
+		// 如果没有采用共享栈，清空pending_co和occupy_co
 		env->pending_co = NULL;
 		env->occupy_co = NULL;
 	}
 	else 
-	{   // 如果采用了共享栈
-		
+	{   
+		// 如果采用了共享栈
 		env->pending_co = pending_co; 
 		
 		//get last occupy co on the same stack mem
@@ -746,7 +755,8 @@ void co_swap(stCoRoutine_t* curr, stCoRoutine_t* pending_co)
 		env->occupy_co = occupy_co;
 		
 		if (occupy_co && occupy_co != pending_co)
-		{  // 如果上一个使用协程不为空,则需要把它的栈内容保存起来。
+		{  
+			// 如果上一个使用协程不为空,则需要把它的栈内容保存起来。
 			save_stack_buffer(occupy_co);
 		}
 	}
@@ -761,7 +771,7 @@ void co_swap(stCoRoutine_t* curr, stCoRoutine_t* pending_co)
 	
 	if (update_occupy_co && update_pending_co && update_occupy_co != update_pending_co)
 	{
-		//resume stack buffer
+		// resume stack buffer
 		// 将栈的内容恢复，如果不是共享栈的话，每个协程都有自己独立的栈空间，则不用恢复。
 		if (update_pending_co->save_buffer && update_pending_co->save_size > 0)
 		{
@@ -885,13 +895,12 @@ void OnPollPreparePfn( stTimeoutItem_t * ap,struct epoll_event &e,stTimeoutItemL
 
 	if( !pPoll->iAllEventDetach )
 	{
-		
 		pPoll->iAllEventDetach = 1;
+
 		// 将该事件移除，然后转移到active列表中
 		RemoveFromLink<stTimeoutItem_t,stTimeoutItemLink_t>( pPoll );
 
 		AddTail( active,pPoll );
-
 	}
 }
 
@@ -1040,6 +1049,10 @@ typedef int (*poll_pfn_t)(struct pollfd fds[], nfds_t nfds, int timeout);
 
 /**
 * 
+* 这个函数也极其重要
+* 1. 大部分的sys_hook都需要用到这个函数来把事件注册到epoll中
+* 2. 这个函数会把poll事件转换为epoll事件
+* 
 * @param ctx epoll上下文
 * @param fds[] fds 要监听的文件描述符 原始poll函数的参数，
 * @param nfds  nfds fds的数组长度 原始poll函数的参数
@@ -1079,10 +1092,10 @@ int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeou
 	}
 	memset( arg.pPollItems,0,nfds * sizeof(stPollItem_t) );
 
-
 	arg.pfnProcess = OnPollProcessEvent;
 	
 	// 保存当前协程，便于调用OnPollProcessEvent时恢复协程
+	// 这里取到的值不是和self一样吗？怎么又获取一次？
 	arg.pArg = GetCurrCo( co_get_curr_thread_env() );
 	
 	
@@ -1147,7 +1160,7 @@ int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeou
 		return -__LINE__;
 	}
 
-	// 把让出CPU
+	// 注册完事件，就让出CPU
 	co_yield_env( co_get_curr_thread_env() );
 
 	RemoveFromLink<stTimeoutItem_t,stTimeoutItemLink_t>( &arg );
@@ -1207,6 +1220,7 @@ struct stHookPThreadSpec_t
 		size = 1024
 	};
 };
+
 void *co_getspecific(pthread_key_t key)
 {
 	stCoRoutine_t *co = GetCurrThreadCo();
@@ -1216,6 +1230,7 @@ void *co_getspecific(pthread_key_t key)
 	}
 	return co->aSpec[ key ].value;
 }
+
 int co_setspecific(pthread_key_t key, const void *value)
 {
 	stCoRoutine_t *co = GetCurrThreadCo();
@@ -1238,6 +1253,7 @@ void co_disable_hook_sys()
 		co->cEnableSysHook = 0;
 	}
 }
+
 /*
 * 检测hook功能是否打开
 */
