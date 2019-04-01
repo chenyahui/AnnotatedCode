@@ -2026,6 +2026,8 @@ event_base_loop(struct event_base *base, int flags)
 		clear_time_cache(base);
 		
 		// 获取当前的active事件
+		// 这个tv_p,非常有意思。指的是，当前的最小超时时间，
+		// 也就是说，如果epoll_wait在tv_p时间内没有返回，那就直接返回
 		res = evsel->dispatch(base, tv_p);
 
 		if (res == -1) {
