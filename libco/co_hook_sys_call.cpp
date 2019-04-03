@@ -362,6 +362,7 @@ ssize_t read( int fd, void *buf, size_t nbyte )
 	pf.events = ( POLLIN | POLLERR | POLLHUP );
 
 	// 最终会调用, co_poll_inner ，将其注册到epoll中
+	// 同时调用co_yield，让出协程
 	int pollret = poll( &pf,1,timeout );
 
 	ssize_t readret = g_sys_read_func( fd,(char*)buf ,nbyte );
@@ -600,6 +601,7 @@ int poll(struct pollfd fds[], nfds_t nfds, int timeout)
 		return g_sys_poll_func( fds,nfds,timeout );
 	}
 
+	// 在当前线程的epoll上，创建一个超时时间
 	return co_poll_inner( co_get_epoll_ct(),fds,nfds,timeout, g_sys_poll_func);
 
 }

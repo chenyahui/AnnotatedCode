@@ -31,7 +31,7 @@
 */
 void* RoutineFunc(void* args)
 {
-	// 打开libco的钩子标识
+	// 打开sys_hook
 	co_enable_hook_sys();
 	
 	int* routineid = (int*)args;
@@ -42,7 +42,7 @@ void* RoutineFunc(void* args)
 
 		printf("%s", sBuff);
 		
-		//相当于sleep，但sleep直接把整个线程休眠了，所以改用poll的方式
+		// sleep 1秒，并且resume
 		poll(NULL, 0, 1000); //sleep 1s
 	}
 	return NULL;
