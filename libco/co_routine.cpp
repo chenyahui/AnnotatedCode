@@ -398,7 +398,7 @@ struct stTimeout_t
 	int iItemSize;   // 默认为60*1000
 
 	unsigned long long ullStart; //目前的超时管理器最早的时间
-	long long llStartIdx; //目前最早的时间所对应的pItems上的索引
+	long long llStartIdx;  //目前最早的时间所对应的pItems上的索引
 };
 
 /*
@@ -425,19 +425,20 @@ void FreeTimeout( stTimeout_t *apTimeout )
 
 /*
 * 将事件添加到定时器中
-* @param apTimeout - (out) 超时管理器
+* @param apTimeout - (ref) 超时管理器
 * @param apItem    - (in) 即将插入的超时事件
 * @param allNow    - (in) 当前时间
 */
 int AddTimeout( stTimeout_t *apTimeout,stTimeoutItem_t *apItem ,unsigned long long allNow )
 {
-	
+
+	// 当前时间管理器的最早超时时间
 	if( apTimeout->ullStart == 0 )
 	{ 
-		// 当前时间管理器的最早时间
 		apTimeout->ullStart = allNow;
 		apTimeout->llStartIdx = 0;
 	}
+
 	if( allNow < apTimeout->ullStart )
 	{
 		co_log_err("CO_ERR: AddTimeout line %d allNow %llu apTimeout->ullStart %llu",
@@ -445,6 +446,7 @@ int AddTimeout( stTimeout_t *apTimeout,stTimeoutItem_t *apItem ,unsigned long lo
 
 		return __LINE__;
 	}
+
 	if( apItem->ullExpireTime < allNow )
 	{
 		co_log_err("CO_ERR: AddTimeout line %d apItem->ullExpireTime %llu allNow %llu apTimeout->ullStart %llu",
@@ -489,11 +491,16 @@ inline void TakeAllTimeout( stTimeout_t *apTimeout,unsigned long long allNow,stT
 		apTimeout->llStartIdx = 0;
 	}
 
+	// 如果当前时间还未达到最早的超时时间，则直接返回
 	if( allNow < apTimeout->ullStart )
 	{
 		return ;
 	}
+
+	// 用当前时间减去最早超时时间，因为每一项代表1ms
+	// 所以cnt刚好就代表了，超时的个数
 	int cnt = allNow - apTimeout->ullStart + 1;
+
 	if( cnt > apTimeout->iItemSize )
 	{
 		cnt = apTimeout->iItemSize;
@@ -506,12 +513,12 @@ inline void TakeAllTimeout( stTimeout_t *apTimeout,unsigned long long allNow,stT
 	for( int i = 0;i<cnt;i++)
 	{
 		int idx = ( apTimeout->llStartIdx + i) % apTimeout->iItemSize;
+
+		// 把该格子上的所有超时时间都放进去(同一时刻可能有多个超时时间)
 		Join<stTimeoutItem_t,stTimeoutItemLink_t>( apResult,apTimeout->pItems + idx  );
 	}
 	apTimeout->ullStart = allNow;
 	apTimeout->llStartIdx += cnt - 1;
-
-
 }
 /**
 * 协程回调函数的封装
@@ -695,6 +702,7 @@ void co_yield_ct()
 {
 	co_yield_env( co_get_curr_thread_env() );
 }
+
 void co_yield( stCoRoutine_t *co )
 {
 	co_yield_env( co->env );
@@ -891,6 +899,12 @@ void OnPollProcessEvent( stTimeoutItem_t * ap )
 	co_resume( co );
 }
 
+// active事件的预处理
+/*
+* @param ap
+* @param e
+* @param active
+*/
 void OnPollPreparePfn( stTimeoutItem_t * ap,struct epoll_event &e,stTimeoutItemLink_t *active )
 {
 	stPollItem_t *lp = (stPollItem_t *)ap;
@@ -929,6 +943,7 @@ void co_eventloop( stCoEpoll_t *ctx,pfn_co_eventloop_t pfn,void *arg )
 
 	for(;;)
 	{
+		// 最大超时时间设置为 1 ms
 		int ret = co_epoll_wait( ctx->iEpollFd,result,stCoEpoll_t::_EPOLL_SIZE, 1 );
 
 		stTimeoutItemLink_t *active = (ctx->pstActiveList);
@@ -936,15 +951,16 @@ void co_eventloop( stCoEpoll_t *ctx,pfn_co_eventloop_t pfn,void *arg )
 
 		memset( timeout,0,sizeof(stTimeoutItemLink_t) );
 
+		// 处理active事件
 		for(int i=0;i<ret;i++)
 		{
 			// 取出本次epoll响应的事件所对应的stTimeoutItem_t
 			stTimeoutItem_t *item = (stTimeoutItem_t*)result->events[i].data.ptr;
 			
+			// 如果定义了预处理函数，则首先进行预处理。在poll函数中，定义了OnPollPreparePfn
 			if( item->pfnPrepare )
 			{
-				// 如果定义了预处理函数，则首先进行预处理。在poll函数中，定义了OnPollPreparePfn
-				item->pfnPrepare( item,result->events[i],active );
+				item->pfnPrepare( item,result->events[i], active );
 			}
 			else
 			{
@@ -952,11 +968,11 @@ void co_eventloop( stCoEpoll_t *ctx,pfn_co_eventloop_t pfn,void *arg )
 			}
 		}
 
-
+		// 获取当前时刻
 		unsigned long long now = GetTickMS();
 
 		// 取出所有的超时事件，放入timeout 链表中
-		TakeAllTimeout( ctx->pTimeout,now,timeout );
+		TakeAllTimeout( ctx->pTimeout, now, timeout );
 
 		stTimeoutItem_t *lp = timeout->head;
 		while( lp )
@@ -1068,7 +1084,6 @@ typedef int (*poll_pfn_t)(struct pollfd fds[], nfds_t nfds, int timeout);
 */
 int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeout, poll_pfn_t pollfunc)
 {
-	
 	if( timeout > stTimeoutItem_t::eMaxTimeout )
 	{
 		timeout = stTimeoutItem_t::eMaxTimeout;
@@ -1099,12 +1114,13 @@ int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeou
 	}
 	memset( arg.pPollItems,0,nfds * sizeof(stPollItem_t) );
 
+	// 当事件到来的时候，就调用这个callback。
+	// 这个callback内部做了co_resume的动作
 	arg.pfnProcess = OnPollProcessEvent;
 	
 	// 保存当前协程，便于调用OnPollProcessEvent时恢复协程
 	// 这里取到的值不是和self一样吗？怎么又获取一次？
 	arg.pArg = GetCurrCo( co_get_curr_thread_env() );
-	
 	
 	//2. add epoll
 	for(nfds_t i=0;i<nfds;i++)
@@ -1113,7 +1129,9 @@ int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeou
 		arg.pPollItems[i].pSelf = arg.fds + i;
 		arg.pPollItems[i].pPoll = &arg;
 
-		arg.pPollItems[i].pfnPrepare = OnPollPreparePfn;
+		// 设置一个预处理的callback
+		arg.pPollItems[i].pfnPrepare = OnPollPreparePfn; 
+
 		struct epoll_event &ev = arg.pPollItems[i].stEvent;
 
 		if( fds[i].fd > -1 )
@@ -1144,8 +1162,10 @@ int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeou
 	//3.add timeout
 	// 获取当前时间
 	unsigned long long now = GetTickMS();
+
 	// 超时时间
-	arg.ullExpireTime = now + timeout;
+	arg.ullExpireTime = now + timeout;	// 如果timeout == 0
+	
 	// 将其添加到超时链表中
 	int ret = AddTimeout( ctx->pTimeout,&arg,now );
 
@@ -1167,9 +1187,14 @@ int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeou
 		return -__LINE__;
 	}
 
-	// 注册完事件，就让出CPU
+	// 注册完事件，就yield。切换到其他协程
+	// 当事件到来的时候，就会调用callback。
 	co_yield_env( co_get_curr_thread_env() );
 
+	// 注意：！！这个时候，已经和上面的逻辑不在同一个时刻处理了
+	// 这个时候，协程已经resume回来了！！
+
+	// 把之前注册的全部删除掉和释放掉
 	RemoveFromLink<stTimeoutItem_t,stTimeoutItemLink_t>( &arg );
 	for(nfds_t i = 0;i < nfds;i++)
 	{
@@ -1180,7 +1205,6 @@ int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeou
 		}
 		fds[i].revents = arg.fds[i].revents;
 	}
-
 
 	int iRaiseCnt = arg.iRaiseCnt;
 	if( arg.pPollItems != arr )
@@ -1304,8 +1328,9 @@ static void OnSignalProcessEvent( stTimeoutItem_t * ap )
 stCoCondItem_t *co_cond_pop( stCoCond_t *link );
 /*
 *
-* 功能类似于pthread_cond_signal
+* 语义上类似于pthread_cond_signal
 * 唤醒等待队列中其中一个协程
+* 
 */
 int co_cond_signal( stCoCond_t *si )
 {
@@ -1342,7 +1367,8 @@ int co_cond_broadcast( stCoCond_t *si )
 }
 
 /**
-* 功能类似于 pthread_cond_wait
+* 语义上类似于 pthread_cond_wait
+* 实际上最终执行了 co_yield
 * @link 条件
 * @ms 超时时间 如果为0或者-1，则永久不失效
 */
