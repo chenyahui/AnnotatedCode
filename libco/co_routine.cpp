@@ -319,6 +319,8 @@ static stStackMem_t* co_get_stackmem(stShareStack_t* share_stack)
 	{
 		return NULL;
 	}
+
+	// 轮询的使用shared_stack
 	int idx = share_stack->alloc_idx % share_stack->count;
 	share_stack->alloc_idx++;
 
@@ -517,7 +519,7 @@ inline void TakeAllTimeout( stTimeout_t *apTimeout,unsigned long long allNow,stT
 	apTimeout->llStartIdx += cnt - 1;
 }
 /**
-* 协程回调函数的封装
+* 协程回调函数的wrapper
 */
 static int CoRoutineFunc( stCoRoutine_t *co,void * )
 {
@@ -525,12 +527,13 @@ static int CoRoutineFunc( stCoRoutine_t *co,void * )
 	{
 		co->pfn( co->arg );
 	}
+
+	// 标识该协程已经结束
 	co->cEnd = 1;
 
 	stCoRoutineEnv_t *env = co->env;
 
 	co_yield_env( env );
-	// 协程结束后，为何没有内存释放
 	return 0;
 }
 
@@ -551,6 +554,8 @@ struct stCoRoutine_t *co_create_env( stCoRoutineEnv_t * env, const stCoRoutineAt
 	{
 		memcpy( &at,attr,sizeof(at) );
 	}
+
+
 	if( at.stack_size <= 0 )
 	{
 		at.stack_size = 128 * 1024; // 默认的为128k
@@ -578,7 +583,7 @@ struct stCoRoutine_t *co_create_env( stCoRoutineEnv_t * env, const stCoRoutineAt
 	stStackMem_t* stack_mem = NULL;
 	if( at.share_stack )
 	{
-		// 如果采用了共享栈模式，则获取到它的共享栈的内存
+		// 如果采用了共享栈模式，则获取到其中一个共享栈的内存
 		stack_mem = co_get_stackmem( at.share_stack);
 		at.stack_size = at.share_stack->stack_size;
 	}
@@ -587,6 +592,7 @@ struct stCoRoutine_t *co_create_env( stCoRoutineEnv_t * env, const stCoRoutineAt
 		// 如果没有采用共享栈，则分配内存
 		stack_mem = co_alloc_stackmem(at.stack_size);
 	}
+
 	lp->stack_mem = stack_mem;
 
 	lp->ctx.ss_sp = stack_mem->stack_buffer;
@@ -659,7 +665,7 @@ void co_resume( stCoRoutine_t *co )
 	if( !co->cStart )
 	{
 		// 如果当前协程还没有开始运行，为其构建上下文
-		coctx_make( &co->ctx,(coctx_pfn_t)CoRoutineFunc,co,0 );
+		coctx_make( &co->ctx,(coctx_pfn_t)CoRoutineFunc,co, 0 );
 		co->cStart = 1;
 	}
 	// 将当前协程放入线程的协程队列末尾
@@ -1183,6 +1189,7 @@ int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeou
 	// 当事件到来的时候，就会调用callback。
 	co_yield_env( co_get_curr_thread_env() );
 
+	// --------------------分割线---------------------------
 	// 注意：！！这个时候，已经和上面的逻辑不在同一个时刻处理了
 	// 这个时候，协程已经resume回来了！！
 
