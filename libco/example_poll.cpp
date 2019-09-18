@@ -58,8 +58,6 @@ static int SetNonBlock(int iSock)
     return ret;
 }
 
-
-
 static void SetAddr(const char *pszIP,const unsigned short shPort,struct sockaddr_in &addr)
 {
 	bzero(&addr,sizeof(addr));
