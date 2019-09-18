@@ -44,7 +44,7 @@ struct stStackMem_t
 */
 struct stShareStack_t
 {
-	unsigned int alloc_idx; // 共享栈的目前已经由多少个协程共享
+	unsigned int alloc_idx; // 应该是目前正在使用的那个共享栈的index
 	int stack_size; // 共享栈的大小，这里的大小指的是一个stStackMem_t*的大小
 	int count;   // 共享栈的个数，共享栈可以为多个，所以以下为共享栈的数组
 	stStackMem_t** stack_array; //栈的内容，这里是个数组，元素是stStackMem_t*

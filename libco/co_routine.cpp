@@ -289,7 +289,8 @@ stStackMem_t* co_alloc_stackmem(unsigned int stack_size)
 }
 
 /**
-* 创建共享栈
+* 创建一个共享栈
+
 * @param count 创建共享栈的个数
 * @param stack_size 每个共享栈的大小
 */
@@ -382,12 +383,13 @@ struct stTimeoutItemLink_t
 };
 /*
 * 毫秒级的超时管理器
-*
+* 使用时间轮实现
 * 但是是有限制的，最长超时时间不可以超过iItemSize毫秒
 */
 struct stTimeout_t
 {
 	/*
+	   时间轮
 	   超时事件数组，总长度为iItemSize,每一项代表1毫秒，为一个链表，代表这个时间所超时的事件。
 
 	   这个数组在使用的过程中，会使用取模的方式，把它当做一个循环数组来使用，虽然并不是用循环链表来实现的
@@ -684,7 +686,9 @@ void co_resume( stCoRoutine_t *co )
 */
 void co_yield_env( stCoRoutineEnv_t *env )
 {
-	// 这里可以很清楚的看到，
+	// 这里直接取了iCallStackSize - 2，那么万一icallstacksize < 2呢？
+	// 比如当前只有主线程？会不会有这种可能？如果不会，为什么？
+
 	stCoRoutine_t *last = env->pCallStack[ env->iCallStackSize - 2 ];
 
 	// 当前栈
@@ -854,6 +858,8 @@ static short EpollEvent2Poll( uint32_t events )
 
 
 static stCoRoutineEnv_t* g_arrCoEnvPerThread[ 204800 ] = { 0 };
+
+// 初始化当前线程的协程管理器
 void co_init_curr_thread_env()
 {
 	//当前的线程的ID
