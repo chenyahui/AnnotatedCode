@@ -24,7 +24,7 @@ struct schedule {
 	char stack[STACK_SIZE];	// 运行时栈
 
 	ucontext_t main; // 主协程的上下文
-	int nco; // 未运行结束的协程个数
+	int nco; // 当前存活的协程个数
 	int cap; // 协程管理器的当前最大容量，即可以同时支持多少个协程。如果不够了，则进行扩容
 	int running; // 正在运行的协程ID
 	struct coroutine **co; // 一个一维数组，用于存放协程 
@@ -38,7 +38,7 @@ struct coroutine {
 	void *ud;  // 协程参数
 	ucontext_t ctx; // 协程上下文
 	struct schedule * sch; // 该协程所属的调度器
-	ptrdiff_t cap; 	 // 协程在运行中，最大的
+	ptrdiff_t cap; 	 // 已经分配的内存大小
 	ptrdiff_t size; // 当前协程运行时栈，保存起来后的大小
 	int status;	// 协程当前的状态
 	char *stack; // 当前协程的保存起来的运行时栈
@@ -86,7 +86,7 @@ coroutine_open(void) {
 }
 
 /**
-* 关闭一个协程调度器
+* 关闭一个协程调度器，同时清理掉其负责管理的
 * @param S 将此调度器关闭
 */
 void 
@@ -95,6 +95,7 @@ coroutine_close(struct schedule *S) {
 	// 关闭掉每一个协程
 	for (i=0;i<S->cap;i++) {
 		struct coroutine * co = S->co[i];
+
 		if (co) {
 			_co_delete(co);
 		}
@@ -107,7 +108,7 @@ coroutine_close(struct schedule *S) {
 }
 
 /**
-* 创建一个协程
+* 创建一个协程对象
 * @param S 该协程所属的调度器
 * @param func 该协程函数执行体
 * @param ud func的参数
@@ -187,14 +188,16 @@ coroutine_resume(struct schedule * S, int id) {
 	int status = C->status;
 	switch(status) {
 	case COROUTINE_READY:
-	    //初始化ucontext_t结构体
+	    //初始化ucontext_t结构体,将当前的上下文放到C->ctx里面
 		getcontext(&C->ctx);
 		// 将当前协程的运行时栈的栈顶设置为S->stack，每个协程都这么设置，这就是所谓的共享栈。（注意，这里是栈顶）
 		C->ctx.uc_stack.ss_sp = S->stack; 
 		C->ctx.uc_stack.ss_size = STACK_SIZE;
-		C->ctx.uc_link = &S->main;
+		C->ctx.uc_link = &S->main; // 如果协程执行完，将切换到主协程中执行
 		S->running = id;
 		C->status = COROUTINE_RUNNING;
+
+		// 设置执行C->ctx函数, 并将S作为参数传进去
 		uintptr_t ptr = (uintptr_t)S;
 		makecontext(&C->ctx, (void (*)(void)) mainfunc, 2, (uint32_t)ptr, (uint32_t)(ptr>>32));
 

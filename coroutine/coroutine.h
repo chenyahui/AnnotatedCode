@@ -20,6 +20,7 @@ void coroutine_close(struct schedule *);
 
 // 创建一个协程
 int coroutine_new(struct schedule *, coroutine_func, void *ud);
+
 // 切换到对应协程中执行
 void coroutine_resume(struct schedule *, int id);
 

@@ -1,3 +1,6 @@
+此库为coroutine注释版, 里面详细写了本人阅读代码的注释和心得。
+总体coroutine的原理分析，可以查看博客[云风coroutine协程库源码分析](http://www.cyhone.com/articles/analysis-of-cloudwu-coroutine/)
+
 It's an asymmetric coroutine library (like lua).
 
 You can use coroutine_open to open a schedule first, and then create coroutine in that schedule. 
