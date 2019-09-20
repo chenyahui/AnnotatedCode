@@ -63,7 +63,7 @@ struct stCoRoutine_t
 	char cStart;          // 是否已经开始运行了
 	char cEnd;            // 是否已经结束
 	char cIsMain;         // 是否是主协程
-	char cEnableSysHook;  // 是否要打开钩子标识
+	char cEnableSysHook;  // 是否要打开钩子标识，默认是关闭的
 	char cIsShareStack;   // 是否要采用共享栈
 
 	void *pvEnv;

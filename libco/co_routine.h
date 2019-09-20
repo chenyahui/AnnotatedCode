@@ -44,7 +44,7 @@ struct stCoRoutineAttr_t
 
 struct stCoEpoll_t;
 typedef int (*pfn_co_eventloop_t)(void *);
-typedef void *(*pfn_co_routine_t)( void * );
+typedef void *(*pfn_co_routine_t)(void *);
 
 //2.co_routine
 

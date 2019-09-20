@@ -56,9 +56,10 @@ struct rpchook_t
 	struct sockaddr_in dest; //maybe sockaddr_un;
 	int domain; //AF_LOCAL , AF_INET
 
-	struct timeval read_timeout; // 读超时
-	struct timeval write_timeout; // 写超时
+	struct timeval read_timeout; // 读超时时间
+	struct timeval write_timeout; // 写超时时间
 };
+
 static inline pid_t GetPid()
 {
 	char **p = (char**)pthread_self();
@@ -182,8 +183,6 @@ static inline ll64_t diff_ms(struct timeval &begin,struct timeval &end)
 	return u;
 }
 
-
-
 static inline rpchook_t * get_by_fd( int fd )
 {
 	if( fd > -1 && fd < (int)sizeof(g_rpchook_socket_fd) / (int)sizeof(g_rpchook_socket_fd[0]) )
@@ -193,6 +192,7 @@ static inline rpchook_t * get_by_fd( int fd )
 	}
 	return NULL;
 }
+
 static inline rpchook_t * alloc_by_fd( int fd )
 {
 	if( fd > -1 && fd < (int)sizeof(g_rpchook_socket_fd) / (int)sizeof(g_rpchook_socket_fd[0]) )
@@ -205,6 +205,7 @@ static inline rpchook_t * alloc_by_fd( int fd )
 	}
 	return NULL;
 }
+
 static inline void free_by_fd( int fd )
 {
 	if( fd > -1 && fd < (int)sizeof(g_rpchook_socket_fd) / (int)sizeof(g_rpchook_socket_fd[0]) )
@@ -251,6 +252,7 @@ int co_accept( int fd, struct sockaddr *addr, socklen_t *len )
 	alloc_by_fd( cli );
 	return cli;
 }
+
 int connect(int fd, const struct sockaddr *address, socklen_t address_len)
 {
 	HOOK_SYS_FUNC( connect );
@@ -605,6 +607,7 @@ int poll(struct pollfd fds[], nfds_t nfds, int timeout)
 	return co_poll_inner( co_get_epoll_ct(),fds,nfds,timeout, g_sys_poll_func);
 
 }
+
 int setsockopt(int fd, int level, int option_name,
 			                 const void *option_value, socklen_t option_len)
 {
