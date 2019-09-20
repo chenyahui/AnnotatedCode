@@ -63,7 +63,7 @@ public:
         int64_t outgoing_send_timeout;
         int64_t outgoing_idle_timeout;
 
-         size_t maximum_incoming_connections;
+        size_t maximum_incoming_connections;
 
     }; // struct Configure
 

@@ -204,6 +204,8 @@ private:
 
 }; // class EasyServer::ProxyListener
 
+// ProxyHandler是对EasyHandler的一个代理式封装
+
 class EasyServer::ProxyHandler : public LinkageHandler {
 public:
     virtual ~ProxyHandler() {}
@@ -782,7 +784,9 @@ bool EasyServer::RegisterTimer(int64_t after, int64_t repeat, Runnable *timer)
         return true;
     }
 
+    // 这里可以看到 timer是建立在io线程的
     LinkageWorker *worker = GetIoWorker(-1);
+
     if (tid > 0 && tid == worker->running_thread_id()) {
         glocker.Unlock();
         if (!worker->RegisterTimer(after, repeat, timer, true)) {
@@ -1375,6 +1379,7 @@ bool EasyServer::Send(const EasyContext &context, const void *buffer, size_t len
     return Send(context.channel(), buffer, length);
 }
 
+// 如果thread_id等于-1，则随机取一个
 EasyServer::ProxyLinkageWorker *EasyServer::GetIoWorker(int thread_id) const
 {
     std::vector<ProxyLinkageWorker *>::const_iterator p = _io_workers.begin();

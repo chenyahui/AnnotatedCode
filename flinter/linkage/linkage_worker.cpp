@@ -170,6 +170,7 @@ bool LinkageWorker::Run()
         throw std::runtime_error("Linkage: failed to initialize.");
     }
 
+    // 每1秒对连接进行一次健康检查
     HealthTimer *health = new HealthTimer(this);
     if (!RegisterTimer(1000000000LL, health, true)) {
         delete health;

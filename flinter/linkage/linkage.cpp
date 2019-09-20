@@ -548,6 +548,11 @@ void Linkage::UpdateLastSent(bool sent, bool jammed)
 
 bool Linkage::Cleanup(int64_t now)
 {
+    // 整个清理的模式都是如下：
+    // 
+    // jammed_c表示被卡住的时间
+    // _connect_timeout表示配置的连接超时时间
+    // _connect_jam表示开始连接的时间，连接成功后，会置为0
     int64_t jammed_c = _connect_jam ? now - _connect_jam : 0;
     if (_connect_timeout && jammed_c && jammed_c >= _connect_timeout) {
         CLOG.Verbose("Linkage: connecting but timed out for fd = %d", _peer->fd());
@@ -569,6 +574,8 @@ bool Linkage::Cleanup(int64_t now)
     int64_t passed_w = now - _last_sent;
     int64_t passed_r = now - _last_received;
     int64_t idle = passed_r < passed_w ? passed_r : passed_w;
+
+    // 连接空闲的时长
     if (_idle_timeout && idle >= _idle_timeout) {
         CLOG.Verbose("Linkage: connection idle out for fd = %d", _peer->fd());
         return false;
