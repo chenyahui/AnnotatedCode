@@ -48,6 +48,8 @@ void EventLoopThreadPool::start(const ThreadInitCallback& cb)
     threads_.push_back(t);
     loops_.push_back(t->startLoop());
   }
+
+  // 如果没有thread pool
   if (numThreads_ == 0 && cb)
   {
     cb(baseLoop_);
