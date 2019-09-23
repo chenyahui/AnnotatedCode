@@ -164,6 +164,7 @@ private:
 
 }; // class OutgoingInformation
 
+// linkageWorker的一个proxy类，用于EasyServer测封装一些行为
 class EasyServer::ProxyLinkageWorker : public LinkageWorker {
 public:
     virtual ~ProxyLinkageWorker() {}
@@ -478,6 +479,7 @@ ssize_t EasyServer::ProxyHandler::GetMessageLength(Linkage *linkage,
     return h->GetMessageLength(*l->context(), buffer, length);
 }
 
+// 当连接有消息到来时，在这个函数中处理
 int EasyServer::ProxyHandler::OnMessage(Linkage *linkage,
                                         const void *buffer,
                                         size_t length)
@@ -489,6 +491,8 @@ int EasyServer::ProxyHandler::OnMessage(Linkage *linkage,
 
     // _workers are only set in single threaded environment,
     // skip locking to get better performance.
+
+    // 如果存在jobworkers，则直接把任务抛给jobworkers处理
     if (s->_workers) {
         JobWorker::Job *job = new JobWorker::Job(l->context(), buffer, length);
         int hash = l->context()->easy_handler()->HashMessage(
@@ -499,6 +503,7 @@ int EasyServer::ProxyHandler::OnMessage(Linkage *linkage,
         return 1;
     }
 
+    // 如果不存在，则直接在io线程处理
     // Same thread, handle events to LinkageWorker.
     EasyContext &c = *l->context();
     return c.easy_handler()->OnMessage(c, buffer, length);
@@ -819,6 +824,7 @@ bool EasyServer::Initialize(const std::string &slots,
         return false;
     }
 
+    // 初始化线程池, 线程池的个数等于 ioworker的数目 + jobworker的数目
     size_t total = as.size() + aw.size();
     if (!_pool->Initialize(total)) {
         LOG(ERROR) << "EasyServer: failed to initialize thread pool.";
@@ -833,11 +839,15 @@ bool EasyServer::Initialize(const std::string &slots,
     _slots = as.size();
 
     MutexLocker glocker(_gmutex);
+
+    // 创建iowoker
     for (size_t i = 0; i < as.size(); ++i) {
         ProxyLinkageWorker *worker =
                 new ProxyLinkageWorker(easy_tuner, static_cast<int>(i), as[i]);
 
         _io_workers.push_back(worker);
+
+        // 将ioworker和listener绑定起来
         if (!AttachListeners(worker)) {
             LOG(ERROR) << "EasyServer: failed to initialize I/O workers.";
             DoShutdown(&glocker);
@@ -845,10 +855,13 @@ bool EasyServer::Initialize(const std::string &slots,
         }
     }
 
+    // 注册定时器，这样就是不是意味着运行后，没办法再注册timer了
     for (std::list<std::pair<Runnable *, std::pair<int64_t, int64_t> > >::iterator
          p = _timers.begin(); p != _timers.end();) {
 
+        // -1代表随机取一个ioworker
         LinkageWorker *worker = GetIoWorker(-1);
+        
         if (!worker->RegisterTimer(p->second.first, p->second.second, p->first, true)) {
             LOG(ERROR) << "EasyServer: failed to initialize timers.";
             DoShutdown(&glocker);
@@ -858,11 +871,13 @@ bool EasyServer::Initialize(const std::string &slots,
         p = _timers.erase(p);
     }
 
+    // 初始化IoContext
     _io_context.reserve(as.size());
     for (size_t i = 0; i < as.size(); ++i) {
         _io_context.push_back(new IoContext(static_cast<int>(i)));
     }
 
+    // 初始化jobworker
     for (size_t i = 0; i < aw.size(); ++i) {
         JobWorker *worker = new JobWorker(this, easy_tuner, i, aw[i]);
         _job_workers.push_back(worker);
@@ -871,6 +886,7 @@ bool EasyServer::Initialize(const std::string &slots,
     _hashjobs.resize(aw.size());
 
     // Now multi-threading.
+
     for (std::vector<ProxyLinkageWorker *>::const_iterator
          p = _io_workers.begin(); p != _io_workers.end(); ++p) {
 
@@ -1117,6 +1133,7 @@ Linkage *EasyServer::AllocateChannel(LinkageWorker *worker,
     }
 
     std::pair<EasyHandler *, bool> h = GetEasyHandler(proxy_handler);
+
     EasyContext *context = new EasyContext(this, h.first, h.second,
                                            channel, peer, me,
                                            w->thread_id());

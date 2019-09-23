@@ -127,6 +127,8 @@ void EventLoop::loop()
     }
     currentActiveChannel_ = NULL;
     eventHandling_ = false;
+
+    // 处理那些通过queueInLoop排队的函数
     doPendingFunctors();
   }
 

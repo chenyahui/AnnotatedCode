@@ -27,6 +27,7 @@ namespace flinter {
 class LinkagePeer;
 class LinkageWorker;
 
+// 一个纯虚函数
 class LinkageBase {
 public:
     friend class LinkageWorker;

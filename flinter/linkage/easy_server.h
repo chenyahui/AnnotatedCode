@@ -53,11 +53,13 @@ public:
     typedef uint64_t channel_t;
 
     struct Configure {
+        // incoming连接的相关配置，即从其他服务主动请求本服务的连接
         int64_t incoming_receive_timeout;
         int64_t incoming_connect_timeout;
         int64_t incoming_send_timeout;
         int64_t incoming_idle_timeout;
 
+        // outgoing连接的相关配置，即从本服务主动请求其他服务的连接
         int64_t outgoing_receive_timeout;
         int64_t outgoing_connect_timeout;
         int64_t outgoing_send_timeout;
@@ -106,6 +108,7 @@ public:
     /// Call before Initialize().
     /// Either handler or factory must be set.
     /// handler/factory life span NOT taken, keep it valid.
+    // 可以多次调用Listen监听端口
     bool Listen(const ListenOption &o);
 
     /// Allocate channel for outgoing connection.

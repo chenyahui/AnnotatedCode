@@ -36,6 +36,8 @@ class LinkageBase;
 class LinkagePeer;
 class Mutex;
 
+// 跑在io线程上的woker
+// 其中的Run是个loop循环
 class LinkageWorker : public Runnable {
 public:
     friend class LinkageBase;
@@ -83,6 +85,8 @@ protected:
 
     // Only used by Linkages, don't call explicitly.
     bool Detach(LinkageBase *linkage);
+
+    // 把linkage放入到ioworker对应的event loop中
     bool Attach(LinkageBase *linkage, int fd,
                 bool read_now, bool write_now,
                 bool auto_release);

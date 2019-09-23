@@ -33,6 +33,8 @@ struct sockaddr;
 
 namespace flinter {
 
+// 一个ip地址类，相当于muduo中的InetAddress
+// 但是这个不同的是，这个还包含fd，表示已连接的地址
 class LinkagePeer {
 public:
     LinkagePeer();
