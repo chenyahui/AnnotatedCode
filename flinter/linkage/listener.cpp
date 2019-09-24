@@ -87,7 +87,10 @@ int Listener::OnReadable(LinkageWorker *worker)
     LinkagePeer me;
     LinkagePeer peer;
     Interface::Option o;
+    // accept这个连接
     int ret = _listener.Accept(o, &peer, &me);
+
+    // 错误处理
     if (ret < 0) {
         if (errno == EINTR          ||
             errno == EAGAIN         ||
@@ -121,13 +124,17 @@ int Listener::OnReadable(LinkageWorker *worker)
         return 1;
     }
 
+    // 创建连接
     LinkageBase *linkage = CreateLinkage(worker, peer, me);
+
     if (!linkage) {
         CLOG.Warn("Listener: failed to create client from fd = %d", peer.fd());
         safe_close(peer.fd());
         return 1;
     }
 
+    // 1. 将这个tcp连接和具体worker绑定，这样的话才能加入事件循环
+    // 2. 所以可以看出来，在哪个线程listen的，新的连接也放在哪个io线程
     if (!linkage->Attach(worker)) {
         CLOG.Verbose("Listener: failed to attach client for fd = %d", peer.fd());
         delete linkage;

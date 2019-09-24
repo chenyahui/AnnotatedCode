@@ -836,6 +836,7 @@ int Interface::ConnectTcp4(const std::string &hostname,
     return Connect(s, o, peer, me);
 }
 
+// 一直等到连接成功
 bool Interface::WaitUntilConnected(int64_t timeout)
 {
     if (_socket < 0) {

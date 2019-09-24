@@ -343,6 +343,7 @@ int safe_connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
         return -1;
     }
 
+    // 如果错误码为EINTR则重新调用系统调用
     do {
         ret = connect(sockfd, addr, addrlen);
     } while (ret < 0 && errno == EINTR);

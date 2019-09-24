@@ -479,7 +479,7 @@ ssize_t EasyServer::ProxyHandler::GetMessageLength(Linkage *linkage,
     return h->GetMessageLength(*l->context(), buffer, length);
 }
 
-// 当连接有消息到来时，在这个函数中处理
+// 当一个连接上，有新的消息到来时，在这个函数中处理
 int EasyServer::ProxyHandler::OnMessage(Linkage *linkage,
                                         const void *buffer,
                                         size_t length)
@@ -548,6 +548,7 @@ bool EasyServer::ProxyHandler::Cleanup(Linkage *linkage, int64_t now)
     return h->Cleanup(*l->context(), now);
 }
 
+// 当有新的连接到来的时候，在这个函数中创建新连接
 LinkageBase *EasyServer::ProxyListener::CreateLinkage(LinkageWorker *worker,
                                                       const LinkagePeer &peer,
                                                       const LinkagePeer &me)
@@ -1126,6 +1127,7 @@ Linkage *EasyServer::AllocateChannel(LinkageWorker *worker,
     channel_t channel = AllocateChannel(ioc, true);
 
     Interface *interface = new Interface;
+    // 初始化连接
     if (!interface->Accepted(proxy_handler->accepted_option(), peer.fd())) {
         _incoming_connections.SubAndFetch(1);
         delete interface;
@@ -1337,6 +1339,7 @@ void EasyServer::DoRealSend(ProxyLinkageWorker *worker,
     }
 }
 
+// 发送消息
 bool EasyServer::Send(channel_t channel, const void *buffer, size_t length)
 {
     IoContext *const ioc = GetIoContext(channel);
@@ -1344,10 +1347,13 @@ bool EasyServer::Send(channel_t channel, const void *buffer, size_t length)
         return false;
     }
 
+    // 获取当前线程id
     int64_t tid = get_current_thread_id();
     MutexLocker locker(ioc->_mutex);
     ProxyLinkageWorker *worker = NULL;
     channel_map_t::iterator p = ioc->_channel_linkages.find(channel);
+
+    // 如果channel存在
     if (p != ioc->_channel_linkages.end()) {
         if (!buffer || !length) {
             return true;
@@ -1425,6 +1431,7 @@ EasyServer::ProxyLinkage *EasyServer::DoReconnect(
     LinkagePeer peer;
     Interface *interface = new Interface;
     std::pair<EasyHandler *, bool> h = GetEasyHandler(info->proxy_handler());
+    
     int ret = interface->Connect(info->socket(), info->option(), &peer, &me);
 
     EasyContext *context = new EasyContext(this, h.first, h.second,
