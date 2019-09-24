@@ -231,6 +231,7 @@ bufferevent_readcb(evutil_socket_t fd, short event, void *arg)
 	bufferevent_decref_and_unlock_(bufev);
 }
 
+// 当bufferevent的可写时间到达时的处理函数
 static void
 bufferevent_writecb(evutil_socket_t fd, short event, void *arg)
 {
@@ -244,6 +245,7 @@ bufferevent_writecb(evutil_socket_t fd, short event, void *arg)
 
 	bufferevent_incref_and_lock_(bufev);
 
+	// 如果超时了
 	if (event == EV_TIMEOUT) {
 		/* Note that we only check for event==EV_TIMEOUT. If
 		 * event==EV_TIMEOUT|EV_WRITE, we can safely ignore the
@@ -251,6 +253,8 @@ bufferevent_writecb(evutil_socket_t fd, short event, void *arg)
 		what |= BEV_EVENT_TIMEOUT;
 		goto error;
 	}
+
+	// 如果正在连接，（应该是作为client的时候，才会触发这种情况？？）
 	if (bufev_p->connecting) {
 		int c = evutil_socket_finished_connecting_(fd);
 		/* we need to fake the error if the connection was refused
@@ -296,12 +300,14 @@ bufferevent_writecb(evutil_socket_t fd, short event, void *arg)
 	if (bufev_p->write_suspended)
 		goto done;
 
+	// 这段是尽可能的，从buffer里面取数据，往socket里面写数据
 	if (evbuffer_get_length(bufev->output)) {
 		evbuffer_unfreeze(bufev->output, 1);
 		res = evbuffer_write_atmost(bufev->output, fd, atmost);
 		evbuffer_freeze(bufev->output, 1);
 		if (res == -1) {
 			int err = evutil_socket_geterror(fd);
+			// 如果错误类型是需要重新写
 			if (EVUTIL_ERR_RW_RETRIABLE(err))
 				goto reschedule;
 			what |= BEV_EVENT_ERROR;
@@ -325,6 +331,9 @@ bufferevent_writecb(evutil_socket_t fd, short event, void *arg)
 	/*
 	 * Invoke the user callback if our buffer is drained or below the
 	 * low watermark.
+	 * 
+	 * 触发用户定义的write_callback，这里会判断高低水位，只有低于低水位的时候
+	 * 才出发用户的callback
 	 */
 	if (res || !connected) {
 		bufferevent_trigger_nolock_(bufev, EV_WRITE, 0);
@@ -370,7 +379,9 @@ bufferevent_socket_new(struct event_base *base, evutil_socket_t fd,
 	bufev = &bufev_p->bev;
 	evbuffer_set_flags(bufev->output, EVBUFFER_FLAG_DRAINS_TO_FD);
 
-	// 这里可以看到，实际上bufferevent对应两个event，一个read 一个write
+	// 这里可以看到，实际上bufferevent对应两个event对象
+	// 一个用来处理read事件
+	// 一个用来处理write事件
 	event_assign(&bufev->ev_read, bufev->ev_base, fd,
 	    EV_READ|EV_PERSIST|EV_FINALIZE, bufferevent_readcb, bufev);
 		
@@ -576,7 +587,8 @@ bufferevent_new(evutil_socket_t fd,
 	return bufev;
 }
 
-
+// 调用bufferevent_enable()函数，最终会调这个。
+// 里面最终起到的作用是，把事件添加到了event_loop中
 static int
 be_socket_enable(struct bufferevent *bufev, short event)
 {
@@ -588,7 +600,8 @@ be_socket_enable(struct bufferevent *bufev, short event)
 			return -1;
 	return 0;
 }
-// disable的时候直接删除
+
+// disable的时候直接删除，可以看到，是直接从event_loop中删除了
 static int
 be_socket_disable(struct bufferevent *bufev, short event)
 {

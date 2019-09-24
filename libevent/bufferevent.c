@@ -233,6 +233,7 @@ bufferevent_run_readcb_(struct bufferevent *bufev, int options)
 	}
 }
 
+// 触发用户定义的callback
 void
 bufferevent_run_writecb_(struct bufferevent *bufev, int options)
 {
@@ -456,6 +457,7 @@ bufferevent_read_buffer(struct bufferevent *bufev, struct evbuffer *buf)
 	return (evbuffer_add_buffer(buf, bufev->input));
 }
 
+// 开启bufferevent的某些事件
 int
 bufferevent_enable(struct bufferevent *bufev, short event)
 {
@@ -990,6 +992,7 @@ bufferevent_generic_adj_existing_timeouts_(struct bufferevent *bev)
 	return r;
 }
 
+// 可以看到，这个实际上最终调了event_add，将这个事件加入到了event_loop中
 int
 bufferevent_add_event_(struct event *ev, const struct timeval *tv)
 {

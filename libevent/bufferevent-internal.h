@@ -406,9 +406,13 @@ static inline void bufferevent_trigger_nolock_(struct bufferevent *bufev, short 
 static inline void
 bufferevent_trigger_nolock_(struct bufferevent *bufev, short iotype, int options)
 {
+	// 读时间刚好相反，如果高于低水位的时候，才触发用户定义的read_callback
 	if ((iotype & EV_READ) && ((options & BEV_TRIG_IGNORE_WATERMARKS) ||
 	    evbuffer_get_length(bufev->input) >= bufev->wm_read.low))
 		bufferevent_run_readcb_(bufev, options);
+	
+	// 可以看出来，这里判断了高低水位，只有低于低水位的时候，才触发用户定义的write_callback
+	// 
 	if ((iotype & EV_WRITE) && ((options & BEV_TRIG_IGNORE_WATERMARKS) ||
 	    evbuffer_get_length(bufev->output) <= bufev->wm_write.low))
 		bufferevent_run_writecb_(bufev, options);
