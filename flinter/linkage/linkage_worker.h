@@ -36,8 +36,10 @@ class LinkageBase;
 class LinkagePeer;
 class Mutex;
 
-// 跑在io线程上的woker
-// 其中的Run是个loop循环
+// 跑在io线程上的woker，主要作用是进行事件循环event_loop
+// 其语义相当于muduo中的EventLoopThread
+// 可以把listener或者linkage  attach到这个线程上
+// 那么这个io线程就可以监听这个连接的读写事件了
 class LinkageWorker : public Runnable {
 public:
     friend class LinkageBase;

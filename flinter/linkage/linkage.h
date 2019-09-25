@@ -30,6 +30,7 @@ namespace flinter {
 class LinkageHandler;
 class LinkagePeer;
 
+// linkage的语义是就是一条accept之后的连接
 class Linkage : public LinkageBase {
 public:
     /// Won't be initialized until Attach() is called.

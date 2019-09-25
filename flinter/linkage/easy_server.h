@@ -274,6 +274,7 @@ private:
     }
 
     // Locked.
+    // 从连接channel_id反找这个连接所属的io线程
     IoContext *GetIoContext(channel_t channel) const
     {
         if (!IsValidChannel(channel)) {

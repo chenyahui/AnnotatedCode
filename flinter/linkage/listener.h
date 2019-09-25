@@ -26,6 +26,7 @@ namespace flinter {
 
 class LinkagePeer;
 
+// listener的语义和其他框架里面的acceptor一致
 /// This class can be attached to multiple LinkageWorkers.
 class Listener : public LinkageBase {
 public:

@@ -206,7 +206,6 @@ private:
 }; // class EasyServer::ProxyListener
 
 // ProxyHandler是对EasyHandler的一个代理式封装
-
 class EasyServer::ProxyHandler : public LinkageHandler {
 public:
     virtual ~ProxyHandler() {}
@@ -421,6 +420,7 @@ private:
 
 }; // class EasyServer::SendJob
 
+// 每个io线程的上的信息
 class EasyServer::IoContext {
 public:
     explicit IoContext(int thread_id);
@@ -428,10 +428,10 @@ public:
 
     outgoing_map_t _outgoing_informations;
     connect_map_t _connect_proxy_handlers;
-    channel_map_t _channel_linkages;
-    const int _thread_id;
-    Mutex *const _mutex;
-    channel_t _channel;
+    channel_map_t _channel_linkages;    // 连接信息
+    const int _thread_id;   // 该io线程的thread id, 目前这个thread id是手动分配的，不是直接获取的线程id的
+    Mutex *const _mutex;    // 该io线程的mutex，用来给这个线程上的信息加锁
+    channel_t _channel; // 目前已分配的channel的最大值
 
 }; // class EasyServer::IoContext
 
@@ -468,6 +468,7 @@ EasyServer::JobWorker::Job::Job(const shared_ptr<EasyContext> &context,
                    reinterpret_cast<const char *>(buffer) + length)
 {
     // Intended left blank.
+    // todo 很明显，这里把数据做了一层拷贝
 }
 
 ssize_t EasyServer::ProxyHandler::GetMessageLength(Linkage *linkage,
@@ -480,6 +481,7 @@ ssize_t EasyServer::ProxyHandler::GetMessageLength(Linkage *linkage,
 }
 
 // 当一个连接上，有新的消息到来时，在这个函数中处理
+// 该函数在io线程中执行
 int EasyServer::ProxyHandler::OnMessage(Linkage *linkage,
                                         const void *buffer,
                                         size_t length)
@@ -495,6 +497,7 @@ int EasyServer::ProxyHandler::OnMessage(Linkage *linkage,
     // 如果存在jobworkers，则直接把任务抛给jobworkers处理
     if (s->_workers) {
         JobWorker::Job *job = new JobWorker::Job(l->context(), buffer, length);
+
         int hash = l->context()->easy_handler()->HashMessage(
                 *l->context(), buffer, length);
 
@@ -1608,8 +1611,12 @@ EasyServer::channel_t EasyServer::SslConnectTcp4(
 EasyServer::channel_t EasyServer::AllocateChannel(IoContext *ioc,
                                                   bool incoming_or_outgoing)
 {
+    // 先自加，生成新的channel
+    // 从这里看，生成的channel都是等差的，差值是slots, 这样就不会和其他线程生成的冲突了
     ioc->_channel += _slots;
     channel_t channel = ioc->_channel;
+    
+    // 用一个掩码来代表，这个连接是incoming的还是outgoing的
     if (!incoming_or_outgoing) {
         channel |= 0x8000000000000000ull;
     }

@@ -221,6 +221,8 @@ int Linkage::OnEventOnce(LinkageWorker *worker,
     AbstractIo::Status status = AbstractIo::kStatusBug;
     if (action == AbstractIo::kActionRead) {
         bool more = false;
+
+        // 这里是个buffer在栈上分配的，因此执行完之后，内存就会被自动销毁
         unsigned char buffer[65536];
         status = _io->Read(buffer, sizeof(buffer), &retlen, &more);
         if (status == AbstractIo::kStatusOk) {
