@@ -133,6 +133,7 @@ listener_decref_and_unlock(struct evconnlistener *listener)
 		listener->ops->destroy(listener);
 		UNLOCK(listener);
 		EVTHREAD_FREE_LOCK(listener->lock, EVTHREAD_LOCKTYPE_RECURSIVE);
+		// 释放内存空间
 		mm_free(listener);
 		return 1;
 	} else {
@@ -154,6 +155,10 @@ static void listener_read_cb(evutil_socket_t, short, void *);
 
 /* 
  * 创建一个listener
+ * 里面主要做了几件事
+ * 1. 调用系统的listen函数开始监听套接字
+ * 2. 
+ * 
  * @base
  * @cb
  * @ptr
@@ -191,10 +196,10 @@ evconnlistener_new(struct event_base *base,
 		return NULL;
 
 	lev->base.ops = &evconnlistener_event_ops;
-	lev->base.cb = cb;
-	lev->base.user_data = ptr;
+	lev->base.cb = cb;	// 用户定义的callback
+	lev->base.user_data = ptr; // 
 	lev->base.flags = flags;
-	lev->base.refcnt = 1;
+	lev->base.refcnt = 1; // 默认引用计数为1
 
 	lev->base.accept4_flags = 0;
 
@@ -218,6 +223,13 @@ evconnlistener_new(struct event_base *base,
 	return &lev->base;
 }
 
+// 做了三件事情
+// 1. 创建了一个socket fd
+// 2. 调用bind，该socket fd绑定地址和端口 
+// 3. 创建了evconnlistener对象
+// 但函数执行后尚未加入event_loop中
+// 
+// @cb 连接accept之后，会调用这个用户定义的callback，所以用户不需要在里面再accept了
 struct evconnlistener *
 evconnlistener_new_bind(struct event_base *base, evconnlistener_cb cb,
     void *ptr, unsigned flags, int backlog, const struct sockaddr *sa,
@@ -272,6 +284,7 @@ err:
 	return NULL;
 }
 
+// 释放listener内存空间
 void
 evconnlistener_free(struct evconnlistener *lev)
 {
@@ -283,6 +296,9 @@ evconnlistener_free(struct evconnlistener *lev)
 	listener_decref_and_unlock(lev);
 }
 
+// 1. 把事件从事件循环中删除
+// 2. 如果用户的flags定义了LEV_OPT_CLOSE_ON_FREE， 则close该fd
+// 3. 
 static void
 event_listener_destroy(struct evconnlistener *lev)
 {
@@ -301,6 +317,8 @@ evconnlistener_enable(struct evconnlistener *lev)
 	int r;
 	LOCK(lev);
 	lev->enabled = 1;
+
+	// 如果用户定义了callback
 	if (lev->cb)
 		r = lev->ops->enable(lev);
 	else
@@ -320,6 +338,8 @@ evconnlistener_disable(struct evconnlistener *lev)
 	return r;
 }
 
+// 调用evconnlistener_enable的时候，最终会进入到这个函数上
+// 可以看出来，调用enable，指的是将事件加入event_loop
 static int
 event_listener_enable(struct evconnlistener *lev)
 {
@@ -328,6 +348,8 @@ event_listener_enable(struct evconnlistener *lev)
 	return event_add(&lev_e->listener, NULL);
 }
 
+// 调用evconnlistener_disable的时候，最终会进入到这个函数上
+// 可以看出来，调用disable，指的是将事件从event_loop中删除
 static int
 event_listener_disable(struct evconnlistener *lev)
 {
@@ -372,6 +394,7 @@ event_listener_getbase(struct evconnlistener *lev)
 	return event_get_base(&lev_e->listener);
 }
 
+// 将会在accept成功之后调用
 void
 evconnlistener_set_cb(struct evconnlistener *lev,
     evconnlistener_cb cb, void *arg)
@@ -387,6 +410,7 @@ evconnlistener_set_cb(struct evconnlistener *lev,
 	UNLOCK(lev);
 }
 
+// 设置error callback, error_callback会在accpet出错的时候调用
 void
 evconnlistener_set_error_cb(struct evconnlistener *lev,
     evconnlistener_errorcb errorcb)
@@ -397,6 +421,9 @@ evconnlistener_set_error_cb(struct evconnlistener *lev,
 }
 
 // listener的callback
+// 当监听套接字上有读时间传来的时候，触发这个函数
+// 函数中accept了这个连接
+// @fd: 监听套接字的fd
 static void
 listener_read_cb(evutil_socket_t fd, short what, void *p)
 {
@@ -428,6 +455,7 @@ listener_read_cb(evutil_socket_t fd, short what, void *p)
 			return;
 		}
 		
+		// 引用计数+1
 		++lev->refcnt;
 		cb = lev->cb;
 		user_data = lev->user_data;
@@ -438,11 +466,14 @@ listener_read_cb(evutil_socket_t fd, short what, void *p)
 		    user_data);
 
 		LOCK(lev);
+		// 如果已经等于1了
+		// 说明之前调用过evconnlistener_free，这里处理完就直接关闭掉即可
 		if (lev->refcnt == 1) {
 			int freed = listener_decref_and_unlock(lev);
 			EVUTIL_ASSERT(freed);
 			return;
 		}
+		// 用完了之后，引用计数-1
 		--lev->refcnt;
 		if (!lev->enabled) {
 			/* the callback could have disabled the listener */
@@ -460,6 +491,7 @@ listener_read_cb(evutil_socket_t fd, short what, void *p)
 		errorcb = lev->errorcb;
 		user_data = lev->user_data;
 		UNLOCK(lev);
+		// 发送错误时，调用error_callback
 		errorcb(lev, user_data);
 		LOCK(lev);
 		listener_decref_and_unlock(lev);
