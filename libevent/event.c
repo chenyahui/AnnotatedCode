@@ -2850,6 +2850,7 @@ event_add_nolock_(struct event *ev, const struct timeval *tv,
 	}
 
 	/* if we are not in the right thread, we need to wake up the loop */
+	// 如果event_add的时候，不在loop所在的线程，则唤醒该loop
 	if (res != -1 && notify && EVBASE_NEED_NOTIFY(base))
 		evthread_notify_base(base);
 

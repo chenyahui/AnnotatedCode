@@ -175,6 +175,7 @@ void TimerQueue::cancelInLoop(TimerId timerId)
   assert(timers_.size() == activeTimers_.size());
 }
 
+// 当有timer事件触发时
 void TimerQueue::handleRead()
 {
   loop_->assertInLoopThread();

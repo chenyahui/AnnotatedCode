@@ -482,10 +482,13 @@ listener_read_cb(evutil_socket_t fd, short what, void *p)
 		}
 	}
 	err = evutil_socket_geterror(fd);
+	// 如果是需要再次读写的错误码，则直接返回，等待下次处理
 	if (EVUTIL_ERR_ACCEPT_RETRIABLE(err)) {
 		UNLOCK(lev);
 		return;
 	}
+
+	// 如果不是，则交由用户处理
 	if (lev->errorcb != NULL) {
 		++lev->refcnt;
 		errorcb = lev->errorcb;

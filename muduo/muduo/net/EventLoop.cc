@@ -84,6 +84,7 @@ EventLoop::EventLoop()
   {
     t_loopInThisThread = this;
   }
+  
   wakeupChannel_->setReadCallback(
       boost::bind(&EventLoop::handleRead, this));
   // we are always reading the wakeupfd
@@ -279,6 +280,7 @@ void EventLoop::abortNotInLoopThread()
             << ", current thread id = " <<  CurrentThread::tid();
 }
 
+// 唤醒eventloop，不唤醒的话，eventloop会阻塞在epoll_wait接口
 void EventLoop::wakeup()
 {
   uint64_t one = 1;

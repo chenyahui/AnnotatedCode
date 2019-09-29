@@ -127,6 +127,7 @@ int Listener::OnReadable(LinkageWorker *worker)
     // 创建连接
     LinkageBase *linkage = CreateLinkage(worker, peer, me);
 
+    // 如果创建连接失败了，则直接close这个socket
     if (!linkage) {
         CLOG.Warn("Listener: failed to create client from fd = %d", peer.fd());
         safe_close(peer.fd());

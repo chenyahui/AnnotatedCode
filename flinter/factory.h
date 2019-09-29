@@ -48,7 +48,6 @@ public:
     {
         return Impl::CreateInstance();
     }
-
 }; // class FactoryIndirect
 
 } // namespace flinter

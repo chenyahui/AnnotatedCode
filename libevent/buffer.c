@@ -3310,6 +3310,8 @@ evbuffer_setcb(struct evbuffer *buffer, evbuffer_cb cb, void *cbarg)
 	EVBUFFER_UNLOCK(buffer);
 }
 
+// 增加一个callback
+// callback的作用是？
 struct evbuffer_cb_entry *
 evbuffer_add_cb(struct evbuffer *buffer, evbuffer_cb_func cb, void *cbarg)
 {

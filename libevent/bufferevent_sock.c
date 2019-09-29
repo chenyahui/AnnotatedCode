@@ -128,6 +128,9 @@ bufferevent_socket_set_conn_address_(struct bufferevent *bev,
 	memcpy(&bev_p->conn_address, addr, addrlen);
 }
 
+// 当往outbuf里面写数据的时候，会触发这个callback
+// 该函数里面，会enable写事件
+// 所以用户无需手动enable了
 static void
 bufferevent_socket_outbuf_cb(struct evbuffer *buf,
     const struct evbuffer_cb_info *cbinfo,
@@ -149,6 +152,7 @@ bufferevent_socket_outbuf_cb(struct evbuffer *buf,
 	}
 }
 
+// 当socket的可读事件触发
 static void
 bufferevent_readcb(evutil_socket_t fd, short event, void *arg)
 {
@@ -324,6 +328,8 @@ bufferevent_writecb(evutil_socket_t fd, short event, void *arg)
 		bufferevent_decrement_write_buckets_(bufev_p, res);
 	}
 
+	// 如果buffer为空，则禁用写事件，以防止可写事件频繁触发
+	// 所以用户不用手动禁用了
 	if (evbuffer_get_length(bufev->output) == 0) {
 		event_del(&bufev->ev_write);
 	}
@@ -342,6 +348,7 @@ bufferevent_writecb(evutil_socket_t fd, short event, void *arg)
 	goto done;
 
  reschedule:
+	// 如果buffer为空，则禁用写事件
 	if (evbuffer_get_length(bufev->output) == 0) {
 		event_del(&bufev->ev_write);
 	}
@@ -356,6 +363,7 @@ bufferevent_writecb(evutil_socket_t fd, short event, void *arg)
 }
 
 // 新建socket的一个bufferevent
+// 有可能返回NULL
 struct bufferevent *
 bufferevent_socket_new(struct event_base *base, evutil_socket_t fd,
     int options)
