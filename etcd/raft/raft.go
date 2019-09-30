@@ -252,9 +252,9 @@ func (c *Config) validate() error {
 }
 
 type raft struct {
-	id uint64
+	id uint64    // 编号
 
-	Term uint64
+	Term uint64  // 任期
 	Vote uint64
 
 	readStates []ReadState
@@ -275,7 +275,7 @@ type raft struct {
 	msgs []pb.Message
 
 	// the leader id
-	lead uint64
+	lead uint64		// leader的编号
 	// leadTransferee is id of the leader transfer target when its value is not zero.
 	// Follow the procedure defined in raft thesis 3.10.
 	leadTransferee uint64

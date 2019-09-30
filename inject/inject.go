@@ -85,18 +85,23 @@ func (o *Object) addDep(field string, dep *Object) {
 // The Graph of Objects.
 type Graph struct {
 	Logger      Logger // Optional, will trigger debug logging.
-	unnamed     []*Object
-	unnamedType map[reflect.Type]bool
-	named       map[string]*Object
+	unnamed     []*Object	// 非命名对象
+	unnamedType map[reflect.Type]bool 
+	named       map[string]*Object  // 命名对象
 }
 
 // Provide objects to the Graph. The Object documentation describes
 // the impact of various fields.
 func (g *Graph) Provide(objects ...*Object) error {
+	// 遍历每个对象
 	for _, o := range objects {
+		// 得到对象的类型
 		o.reflectType = reflect.TypeOf(o.Value)
+		// 得到值
 		o.reflectValue = reflect.ValueOf(o.Value)
 
+		// provide阶段不能提供Fields属性
+		// Fields属性是为了
 		if o.Fields != nil {
 			return fmt.Errorf(
 				"fields were specified on object %s when it was provided",
@@ -104,8 +109,11 @@ func (g *Graph) Provide(objects ...*Object) error {
 			)
 		}
 
+		// 如果没有执行名字
 		if o.Name == "" {
-			if !isStructPtr(o.reflectType) {
+			// 如果对象没有提供名字，那么对象必须是 类指针 这种类型！！
+			// 可以思考下，为什么必须是这样
+ 			if !isStructPtr(o.reflectType) {
 				return fmt.Errorf(
 					"expected unnamed object value to be a pointer to a struct but got type %s "+
 						"with value %v",
@@ -114,21 +122,27 @@ func (g *Graph) Provide(objects ...*Object) error {
 				)
 			}
 
+			// 如果不是private的
 			if !o.private {
 				if g.unnamedType == nil {
 					g.unnamedType = make(map[reflect.Type]bool)
 				}
 
+				// 如果之前这个类型已经提供过实例了，那么报错
+				// 这里可以看出来，一个类型只能提供一个示例
 				if g.unnamedType[o.reflectType] {
 					return fmt.Errorf(
 						"provided two unnamed instances of type *%s.%s",
 						o.reflectType.Elem().PkgPath(), o.reflectType.Elem().Name(),
 					)
 				}
+				// 注册
 				g.unnamedType[o.reflectType] = true
 			}
 			g.unnamed = append(g.unnamed, o)
 		} else {
+			// 如果对象提供了名字
+			// 可以思考下，为什么不用做类指针的检查
 			if g.named == nil {
 				g.named = make(map[string]*Object)
 			}
@@ -153,7 +167,9 @@ func (g *Graph) Provide(objects ...*Object) error {
 }
 
 // Populate the incomplete Objects.
+// 填充不完整的对象
 func (g *Graph) Populate() error {
+	// 遍历命名对象
 	for _, o := range g.named {
 		if o.Complete {
 			continue
@@ -211,14 +227,20 @@ func (g *Graph) Populate() error {
 
 func (g *Graph) populateExplicit(o *Object) error {
 	// Ignore named value types.
+	// 如果是命名对象，且不是结构体指针类型的
+	// 则直接返回，因为普通类型不用填充
 	if o.Name != "" && !isStructPtr(o.reflectType) {
 		return nil
 	}
 
 StructLoop:
+	// 遍历这个对象的每个成员变量（属性）
 	for i := 0; i < o.reflectValue.Elem().NumField(); i++ {
+		// 获得该对象的属性
 		field := o.reflectValue.Elem().Field(i)
+		// 获得该属性的类型
 		fieldType := field.Type()
+		
 		fieldTag := o.reflectType.Elem().Field(i).Tag
 		fieldName := o.reflectType.Elem().Field(i).Name
 		tag, err := parseTag(string(fieldTag))
@@ -232,6 +254,7 @@ StructLoop:
 		}
 
 		// Skip fields without a tag.
+		// 如果
 		if tag == nil {
 			continue
 		}
@@ -246,6 +269,7 @@ StructLoop:
 		}
 
 		// Inline tag on anything besides a struct is considered invalid.
+		// 如果当前属性的tag是inline，且当前属性不是个结构体，那么报错
 		if tag.Inline && fieldType.Kind() != reflect.Struct {
 			return fmt.Errorf(
 				"inline requested on non inlined field %s in type %s",
@@ -260,8 +284,11 @@ StructLoop:
 		}
 
 		// Named injects must have been explicitly provided.
+		// 如果是个命名对象
 		if tag.Name != "" {
 			existing := g.named[tag.Name]
+
+			// 如果这个名字对应的对象不存在，显然要报错
 			if existing == nil {
 				return fmt.Errorf(
 					"did not find object named %s required by field %s in type %s",
@@ -271,6 +298,7 @@ StructLoop:
 				)
 			}
 
+			// 检查对象是否兼容
 			if !existing.reflectType.AssignableTo(fieldType) {
 				return fmt.Errorf(
 					"object named %s of type %s is not assignable to field %s (%s) in type %s",
@@ -282,7 +310,9 @@ StructLoop:
 				)
 			}
 
+			// 设置值
 			field.Set(reflect.ValueOf(existing.Value))
+
 			if g.Logger != nil {
 				g.Logger.Debugf(
 					"assigned %s to field %s in %s",
@@ -291,12 +321,16 @@ StructLoop:
 					o,
 				)
 			}
+
+			// 设置依赖关系
+			// fieldName依赖于existing
 			o.addDep(fieldName, existing)
 			continue StructLoop
 		}
 
 		// Inline struct values indicate we want to traverse into it, but not
 		// inject itself. We require an explicit "inline" tag for this to work.
+		// 如果不是个命名对象，且等于
 		if fieldType.Kind() == reflect.Struct {
 			if tag.Private {
 				return fmt.Errorf(
@@ -542,6 +576,7 @@ type tag struct {
 	Private bool
 }
 
+// 分析tag
 func parseTag(t string) (*tag, error) {
 	found, value, err := structtag.Extract("inject", t)
 	if err != nil {

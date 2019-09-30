@@ -47,17 +47,23 @@ func newKVStore(snapshotter *snap.Snapshotter, proposeC chan<- string, commitC <
 }
 
 func (s *kvstore) Lookup(key string) (string, bool) {
+	// 加速度哦
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	
 	v, ok := s.kvStore[key]
+	
 	return v, ok
 }
 
+// 
 func (s *kvstore) Propose(k string, v string) {
+	// 将k、v序列化为bytes，同时传递给propose
 	var buf bytes.Buffer
 	if err := gob.NewEncoder(&buf).Encode(kv{k, v}); err != nil {
 		log.Fatal(err)
 	}
+	
 	s.proposeC <- buf.String()
 }
 

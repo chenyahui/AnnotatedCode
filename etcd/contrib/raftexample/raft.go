@@ -78,6 +78,13 @@ var defaultSnapshotCount uint64 = 10000
 // provided the proposal channel. All log entries are replayed over the
 // commit channel, followed by a nil message (to indicate the channel is
 // current), then new log entries. To shutdown, close proposeC and read errorC.
+// 
+// 创建一个raft实例，并且返回一个 已提交日志的channel和错误的channel
+// @id 当前raftnode的编号
+// @peer 集群中其他的节点的地址
+// @proposeC a channel
+// @confChangeC a channel
+// 
 func newRaftNode(id int, peers []string, join bool, getSnapshot func() ([]byte, error), proposeC <-chan string,
 	confChangeC <-chan raftpb.ConfChange) (<-chan *string, <-chan error, <-chan *snap.Snapshotter) {
 
@@ -103,7 +110,10 @@ func newRaftNode(id int, peers []string, join bool, getSnapshot func() ([]byte, 
 		snapshotterReady: make(chan *snap.Snapshotter, 1),
 		// rest of structure populated after WAL replay
 	}
+
+	// 启动raft功能
 	go rc.startRaft()
+	
 	return commitC, errorC, rc.snapshotterReady
 }
 
@@ -258,31 +268,37 @@ func (rc *raftNode) writeError(err error) {
 }
 
 func (rc *raftNode) startRaft() {
+	
+	// 如果不存在，则创建一个快照的文件夹
 	if !fileutil.Exist(rc.snapdir) {
 		if err := os.Mkdir(rc.snapdir, 0750); err != nil {
 			log.Fatalf("raftexample: cannot create dir for snapshot (%v)", err)
 		}
 	}
+
 	rc.snapshotter = snap.New(zap.NewExample(), rc.snapdir)
 	rc.snapshotterReady <- rc.snapshotter
 
 	oldwal := wal.Exist(rc.waldir)
 	rc.wal = rc.replayWAL()
 
+	// 初始化peers数组，给每一个建立一个编号
 	rpeers := make([]raft.Peer, len(rc.peers))
 	for i := range rpeers {
 		rpeers[i] = raft.Peer{ID: uint64(i + 1)}
 	}
+
 	c := &raft.Config{
 		ID:                        uint64(rc.id),
-		ElectionTick:              10,
-		HeartbeatTick:             1,
+		ElectionTick:              10,  // 选举时长
+		HeartbeatTick:             1,   // 心跳时长
 		Storage:                   rc.raftStorage,
 		MaxSizePerMsg:             1024 * 1024,
 		MaxInflightMsgs:           256,
 		MaxUncommittedEntriesSize: 1 << 30,
 	}
 
+	// 如果存在wal日志，则调用重启逻辑
 	if oldwal {
 		rc.node = raft.RestartNode(c)
 	} else {
@@ -311,6 +327,7 @@ func (rc *raftNode) startRaft() {
 	}
 
 	go rc.serveRaft()
+
 	go rc.serveChannels()
 }
 
@@ -378,6 +395,8 @@ func (rc *raftNode) maybeTriggerSnapshot() {
 	rc.snapshotIndex = rc.appliedIndex
 }
 
+// 开始监听各个channel
+
 func (rc *raftNode) serveChannels() {
 	snap, err := rc.raftStorage.Snapshot()
 	if err != nil {
@@ -389,6 +408,7 @@ func (rc *raftNode) serveChannels() {
 
 	defer rc.wal.Close()
 
+	// 每100ms触发一次
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 
@@ -423,6 +443,7 @@ func (rc *raftNode) serveChannels() {
 	// event loop on raft state machine updates
 	for {
 		select {
+		// 当定时器触发时
 		case <-ticker.C:
 			rc.node.Tick()
 
