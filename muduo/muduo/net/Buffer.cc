@@ -1,4 +1,4 @@
-// Copyright 2010, Shuo Chen.  All rights reserved.
+readfd// Copyright 2010, Shuo Chen.  All rights reserved.
 // http://code.google.com/p/muduo/
 //
 // Use of this source code is governed by a BSD-style license

@@ -95,12 +95,16 @@ void TcpConnection::send(const StringPiece& message)
 {
   if (state_ == kConnected)
   {
+    // 这里做了一个检测, send的时候是否在eventloop所在的线程
+    // 
     if (loop_->isInLoopThread())
     {
       sendInLoop(message);
     }
     else
     {
+      // 如果不在eventloop的线程，则调用runInLoop
+      // 把这个过程在eventloop的线程中执行，为了保证线程安全
       loop_->runInLoop(
           boost::bind(&TcpConnection::sendInLoop,
                       this,     // FIXME
@@ -353,11 +357,11 @@ void TcpConnection::handleRead(Timestamp receiveTime)
   {
     messageCallback_(shared_from_this(), &inputBuffer_, receiveTime);
   }
-  else if (n == 0)
+  else if (n == 0) // 当read的返回值是0的时候，代表远端关闭
   {
     handleClose();
   }
-  else
+  else  // 当小于0的时候，代表出错了。
   {
     errno = savedErrno;
     LOG_SYSERR << "TcpConnection::handleRead";

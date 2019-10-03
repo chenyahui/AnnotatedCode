@@ -91,6 +91,7 @@ void TcpServer::newConnection(int sockfd, const InetAddress& peerAddr)
                                           sockfd,
                                           localAddr,
                                           peerAddr));
+  // 持有这个对象，保证TcpConnection的引用计数不为0，连接不被释放。                                        
   connections_[connName] = conn;
   conn->setConnectionCallback(connectionCallback_);
   conn->setMessageCallback(messageCallback_);

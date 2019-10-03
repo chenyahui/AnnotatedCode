@@ -16,6 +16,7 @@ using namespace muduo::net;
 
 Poller* Poller::newDefaultPoller(EventLoop* loop)
 {
+  // 通过此环境变量来决定使用poll还是epoll
   if (::getenv("MUDUO_USE_POLL"))
   {
     return new PollPoller(loop);

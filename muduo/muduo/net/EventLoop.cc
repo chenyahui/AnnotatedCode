@@ -283,6 +283,7 @@ void EventLoop::abortNotInLoopThread()
 // 唤醒eventloop，不唤醒的话，eventloop会阻塞在epoll_wait接口
 void EventLoop::wakeup()
 {
+  // 这里可以看到，本质上是对wakeupFd_进行写操作，以触发其可读事件
   uint64_t one = 1;
   ssize_t n = sockets::write(wakeupFd_, &one, sizeof one);
   if (n != sizeof one)
@@ -304,8 +305,17 @@ void EventLoop::handleRead()
 void EventLoop::doPendingFunctors()
 {
   std::vector<Functor> functors;
+  // callingPendingFunctors_是个优化措施
+  // 标识了是否正在处理这些函数
+
+  // 因为doPendingFunctors是在eventloop的最后处理的
+  // 因此如果此项为false，且isInLoopThread为true
+  // 则说明稍后一定会调用doPendingFunctors处理这些函数的
+  // 这样可以减少调用一次wakeup，减少一次io读写。
   callingPendingFunctors_ = true;
 
+  // 这里也是个优化，因为我们不知道这些func会运行多久
+  // 这样可以减少加锁时长, 以免调用这些func时，时间太长，其他线程无法queueInloop
   {
   MutexLockGuard lock(mutex_);
   functors.swap(pendingFunctors_);
