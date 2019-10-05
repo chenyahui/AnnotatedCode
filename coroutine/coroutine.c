@@ -260,7 +260,7 @@ coroutine_yield(struct schedule * S) {
 	C->status = COROUTINE_SUSPEND;
 	S->running = -1;
 
-	// 将当前
+	// 所以这里可以看到，只能从协程切换到主协程中
 	swapcontext(&C->ctx , &S->main);
 }
 

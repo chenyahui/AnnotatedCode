@@ -156,10 +156,13 @@ static pid_t GetPid()
 	return p ? *(pid_t*)(p + 18) : getpid();
 }
 */
+// 将链表项ap，从链表中删除
 template <class T,class TLink>
 void RemoveFromLink(T *ap)
 {
+	// pLink代表ap所属的链表
 	TLink *lst = ap->pLink;
+
 	if(!lst) return ;
 	assert( lst->head && lst->tail );
 
@@ -372,7 +375,7 @@ struct stTimeoutItem_t
 	OnPreparePfn_t pfnPrepare;  // 预处理函数，在eventloop中会被调用
 	OnProcessPfn_t pfnProcess;  // 处理函数 在eventloop中会被调用
 
-	void *pArg; // self routine 
+	void *pArg; // self routine pArg 是pfnPrepare和pfnProcess的参数
 
 	bool bTimeout; // 是否已经超时
 };
@@ -696,7 +699,7 @@ void co_resume( stCoRoutine_t *co )
 void co_yield_env( stCoRoutineEnv_t *env )
 {
 	// 这里直接取了iCallStackSize - 2，那么万一icallstacksize < 2呢？
-	// 所以这里实际上有个约束，就是co_yield之前必须先co_resume
+	// 所以这里实际上有个约束，就是co_yield之前必须先co_resume, 这样就不会造成这个问题了
 
 	stCoRoutine_t *last = env->pCallStack[ env->iCallStackSize - 2 ];
 
@@ -818,16 +821,15 @@ struct stPoll_t : public stTimeoutItem_t
 	struct pollfd *fds;
 	nfds_t nfds; // typedef unsigned long int nfds_t;
 
-	stPollItem_t *pPollItems;  
+	stPollItem_t *pPollItems;  // 其中的 pPollItems
 
-	int iAllEventDetach;
+	int iAllEventDetach; // 标识是否已经处理过了这个对象了
 
 	int iEpollFd;
 
-	int iRaiseCnt;  
-
-
+	int iRaiseCnt;  // poll的active的事件个数
 };
+
 struct stPollItem_t : public stTimeoutItem_t
 {
 	struct pollfd *pSelf;
@@ -923,28 +925,39 @@ void OnPollProcessEvent( stTimeoutItem_t * ap )
 void OnPollPreparePfn( stTimeoutItem_t * ap,struct epoll_event &e,stTimeoutItemLink_t *active )
 {
 	stPollItem_t *lp = (stPollItem_t *)ap;
+	// 事件转换
 	lp->pSelf->revents = EpollEvent2Poll( e.events );
 
 
 	stPoll_t *pPoll = lp->pPoll;
+
+	// 触发的事件个数增加1，以便co_poll_inner返回结果
 	pPoll->iRaiseCnt++;
 
+	// 是否已经处理过的表示
 	if( !pPoll->iAllEventDetach )
 	{
 		pPoll->iAllEventDetach = 1;
 
-		// 将该事件移除，然后转移到active列表中
+		// 将该事件从超时链表中移除
+		// 因为事件已经触发了，肯定不能再超时了
 		RemoveFromLink<stTimeoutItem_t,stTimeoutItemLink_t>( pPoll );
 
+		// 将该事件添加到active列表中
 		AddTail( active,pPoll );
 	}
 }
 
 /*
-* libco的核心调度，在此处处理所有的协程和事件
-* 
+* libco的核心调度
+* 在此处调度三种事件：
+* 1. 被hook的io事件，该io事件是通过co_pool_inner注册进来的
+* 2. 超时事件
+* 3. 用户主动使用poll的事件
+* 所以，如果用户用到了三种事件，必须得配合使用co_eventloop
+*
 * @param ctx epoll管理器
-* @param pfn 每次有事件响应时，事件处理结束后会调用该函数
+* @param pfn 每轮事件循环的最后会调用该函数
 * @param arg pfn的参数
 */
 void co_eventloop( stCoEpoll_t *ctx,pfn_co_eventloop_t pfn,void *arg )
@@ -953,12 +966,13 @@ void co_eventloop( stCoEpoll_t *ctx,pfn_co_eventloop_t pfn,void *arg )
 	{
 		ctx->result = co_epoll_res_alloc( stCoEpoll_t::_EPOLL_SIZE );
 	}
-	co_epoll_res *result = ctx->result;
 
+	co_epoll_res *result = ctx->result;
 
 	for(;;)
 	{
 		// 最大超时时间设置为 1 ms
+		// 所以最长1ms，epoll_wait就会被唤醒
 		int ret = co_epoll_wait( ctx->iEpollFd,result,stCoEpoll_t::_EPOLL_SIZE, 1 );
 
 		stTimeoutItemLink_t *active = (ctx->pstActiveList);
@@ -980,6 +994,7 @@ void co_eventloop( stCoEpoll_t *ctx,pfn_co_eventloop_t pfn,void *arg )
 			}
 			else
 			{
+				// 否则将其加到active的链表中
 				AddTail( active,item );
 			}
 		}
@@ -987,9 +1002,11 @@ void co_eventloop( stCoEpoll_t *ctx,pfn_co_eventloop_t pfn,void *arg )
 		// 获取当前时刻
 		unsigned long long now = GetTickMS();
 
+		// 以当前时间为超时截止点
 		// 取出所有的超时事件，放入timeout 链表中
 		TakeAllTimeout( ctx->pTimeout, now, timeout );
 
+		// 遍历所有的项，将bTimeout置为true
 		stTimeoutItem_t *lp = timeout->head;
 		while( lp )
 		{
@@ -1004,19 +1021,23 @@ void co_eventloop( stCoEpoll_t *ctx,pfn_co_eventloop_t pfn,void *arg )
 		lp = active->head;
 		while( lp )
 		{
-
 			PopHead<stTimeoutItem_t,stTimeoutItemLink_t>( active );
 			if( lp->pfnProcess )
 			{
 				 /*
 				   处理该事件，默认为OnPollProcessEvent
-				   在OnPollProcessEvent中，会使用co_resume恢复协程
+				   在OnPollProcessEvent中
+				   会使用co_resume恢复协程
+
+				   协程会回到co_poll_inner里面
 				 */
 				lp->pfnProcess( lp );
 			}
 
 			lp = active->head;
 		}
+
+		// 每轮事件循环的最后调用该函数
 		if( pfn )
 		{
 			if( -1 == pfn( arg ) )
@@ -1096,7 +1117,7 @@ typedef int (*poll_pfn_t)(struct pollfd fds[], nfds_t nfds, int timeout);
 * @param fds[] fds 要监听的文件描述符 原始poll函数的参数，
 * @param nfds  nfds fds的数组长度 原始poll函数的参数
 * @param timeout timeout 等待的毫秒数 原始poll函数的参数
-* @param pollfunc 原始的poll函数
+* @param pollfunc 原始的poll函数, g_sys_poll_func
 */
 int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeout, poll_pfn_t pollfunc)
 {
@@ -1104,6 +1125,7 @@ int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeou
 	{
 		timeout = stTimeoutItem_t::eMaxTimeout;
 	}
+
 	int epfd = ctx->iEpollFd;
 
 	// 获取当前协程
@@ -1135,6 +1157,7 @@ int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeou
 	// 这个callback内部做了co_resume的动作
 	arg.pfnProcess = OnPollProcessEvent;
 	
+
 	// 保存当前协程，便于调用OnPollProcessEvent时恢复协程
 	// 这里取到的值不是和co_self一样吗？为什么不用co_self
 	arg.pArg = GetCurrCo( co_get_curr_thread_env() );
@@ -1147,11 +1170,13 @@ int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeou
 		arg.pPollItems[i].pPoll = &arg;
 
 		// 设置一个预处理的callback
-		// 这个函数会在事件active的时候触发
+		// 这个函数会在事件active的时候首先触发
 		arg.pPollItems[i].pfnPrepare = OnPollPreparePfn; 
 
 		struct epoll_event &ev = arg.pPollItems[i].stEvent;
 
+		// 如果大于-1，说明要监听fd的相关事件了
+		// 否则就是个timeout事件
 		if( fds[i].fd > -1 )
 		{
 			// 这个相当于是个userdata, 当事件触发的时候，可以根据这个指针找到之前的数据
@@ -1224,6 +1249,7 @@ int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeou
 	RemoveFromLink<stTimeoutItem_t,stTimeoutItemLink_t>( &arg );
 
 	// 将该项涉及事件全部从epoll中删除掉
+	// 事件一定要删除，不删除会出现误resume的问题
 	for(nfds_t i = 0;i < nfds;i++)
 	{
 		int fd = fds[i].fd;
@@ -1234,6 +1260,7 @@ int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeou
 		fds[i].revents = arg.fds[i].revents;
 	}
 
+	// 释放内存啦
 	int iRaiseCnt = arg.iRaiseCnt;
 	if( arg.pPollItems != arr )
 	{
@@ -1289,6 +1316,7 @@ void *co_getspecific(pthread_key_t key)
 	}
 	return co->aSpec[ key ].value;
 }
+
 
 int co_setspecific(pthread_key_t key, const void *value)
 {

@@ -77,7 +77,7 @@ struct stCoRoutine_t
 	unsigned int save_size; // save_buffer的长度
 	char* save_buffer; // 当协程挂起时，栈的内容会栈暂存到save_buffer中
 
-	stCoSpec_t aSpec[1024];
+	stCoSpec_t aSpec[1024]; 
 };
 
 

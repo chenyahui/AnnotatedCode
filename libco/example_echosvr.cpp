@@ -63,7 +63,6 @@ static int SetNonBlock(int iSock)
 
 static void *readwrite_routine( void *arg )
 {
-
 	co_enable_hook_sys();
 
 	task_t *co = (task_t*)arg;
@@ -72,7 +71,9 @@ static void *readwrite_routine( void *arg )
 	{
 		if( -1 == co->fd )
 		{
+			// push进去
 			g_readwrite.push( co );
+			// 切出
 			co_yield_ct();
 			continue;
 		}
@@ -85,13 +86,19 @@ static void *readwrite_routine( void *arg )
 			struct pollfd pf = { 0 };
 			pf.fd = fd;
 			pf.events = (POLLIN|POLLERR|POLLHUP);
+
+			// 将该fd的可读事件，注册到epoll中
 			co_poll( co_get_epoll_ct(),&pf,1,1000);
 
+			// 当超时或者可读事件到达时，
 			int ret = read( fd,buf,sizeof(buf) );
+
+			// 读多少就写多少
 			if( ret > 0 )
 			{
 				ret = write( fd,buf,ret );
 			}
+
 			if( ret <= 0 )
 			{
 				// accept_routine->SetNonBlock(fd) cause EAGAIN, we should continue
@@ -119,29 +126,36 @@ static void *accept_routine( void * )
 			printf("empty\n"); //sleep
 			struct pollfd pf = { 0 };
 			pf.fd = -1;
+
+			// sleep 1秒，等待有空余的协程
 			poll( &pf,1,1000);
 
 			continue;
-
 		}
+
 		struct sockaddr_in addr; //maybe sockaddr_un;
 		memset( &addr,0,sizeof(addr) );
 		socklen_t len = sizeof(addr);
 
+		// accept
 		int fd = co_accept(g_listen_fd, (struct sockaddr *)&addr, &len);
 		if( fd < 0 )
 		{
+			// 意思是，如果accept失败了，没办法，暂时切出去
 			struct pollfd pf = { 0 };
 			pf.fd = g_listen_fd;
 			pf.events = (POLLIN|POLLERR|POLLHUP);
 			co_poll( co_get_epoll_ct(),&pf,1,1000 );
+
 			continue;
 		}
+
 		if( g_readwrite.empty() )
 		{
 			close( fd );
 			continue;
 		}
+
 		SetNonBlock( fd );
 		task_t *co = g_readwrite.top();
 		co->fd = fd;
@@ -208,8 +222,8 @@ int main(int argc,char *argv[])
 	}
 	const char *ip = argv[1];
 	int port = atoi( argv[2] );
-	int cnt = atoi( argv[3] );
-	int proccnt = atoi( argv[4] );
+	int cnt = atoi( argv[3] ); // task_count 协程数
+	int proccnt = atoi( argv[4] ); // 进程数
 	bool deamonize = argc >= 6 && strcmp(argv[5], "-d") == 0;
 
 	g_listen_fd = CreateTcpSocket( port,ip,true );
@@ -239,14 +253,20 @@ int main(int argc,char *argv[])
 			task_t * task = (task_t*)calloc( 1,sizeof(task_t) );
 			task->fd = -1;
 
+			// 创建一个协程
 			co_create( &(task->co),NULL,readwrite_routine,task );
-			co_resume( task->co );
 
+			// 启动协程
+			co_resume( task->co );
 		}
+
+		// 启动listen协程
 		stCoRoutine_t *accept_co = NULL;
 		co_create( &accept_co,NULL,accept_routine,0 );
+		// 启动协程
 		co_resume( accept_co );
 
+		// 启动事件循环
 		co_eventloop( co_get_epoll_ct(),0,0 );
 
 		exit(0);

@@ -30,6 +30,7 @@ struct stShareStack_t;
 
 /*
 * 协程属性
+* 用于每个协程自定义一些配置
 */
 struct stCoRoutineAttr_t
 {

@@ -242,6 +242,9 @@ int socket(int domain, int type, int protocol)
 	return fd;
 }
 
+// accept是个例外，没有被hook，为什么？
+// issue: https://github.com/Tencent/libco/issues/41
+// 据这个issue的解释，有可能是因为libco的预设应用场景是hook 第三方的client API
 int co_accept( int fd, struct sockaddr *addr, socklen_t *len )
 {
 	int cli = accept( fd,addr,len );
@@ -250,6 +253,7 @@ int co_accept( int fd, struct sockaddr *addr, socklen_t *len )
 		return cli;
 	}
 	alloc_by_fd( cli );
+
 	return cli;
 }
 
@@ -344,10 +348,12 @@ ssize_t read( int fd, void *buf, size_t nbyte )
 		return g_sys_read_func( fd,buf,nbyte );
 	}
 
-	// 根据fd，从一个全局数组中取出其对应的信息。需要提醒的是，该fd会在accept函数或者socket函数时，将其fd放入数组
+	// 根据fd，从一个全局数组中取出其对应的信息。
+	// 需要提醒的是，该fd会在accept函数或者socket函数时，创建alloc_by_fd(), 并将其fd信息放入数组
 	rpchook_t *lp = get_by_fd( fd );
 
-	// 如果该fd没有提前放入到数组中，或者该fd本身就是非阻塞的了，则直接执行
+	// 如果该fd没有提前放入到数组中，即意味着不是被hook的fd
+	// 或者该fd本身就以及是非阻塞的了，
 	if( !lp || ( O_NONBLOCK & lp->user_flag ) ) 
 	{
 		ssize_t ret = g_sys_read_func( fd,buf,nbyte );
@@ -367,6 +373,10 @@ ssize_t read( int fd, void *buf, size_t nbyte )
 	// 同时调用co_yield，让出协程
 	int pollret = poll( &pf,1,timeout );
 
+
+	// 以下部分是yield回来之后调用的
+	// 注意，这里实际上没有判断是超时还是什么
+	// 所以需要调用方自行判断EAGAIN/EWOULDBLOCK错误码
 	ssize_t readret = g_sys_read_func( fd,(char*)buf ,nbyte );
 
 	if( readret < 0 )
@@ -408,12 +418,14 @@ ssize_t write( int fd, const void *buf, size_t nbyte )
 	{
 		wrotelen += writeret;	
 	}
+
 	while( wrotelen < nbyte )
 	{
-
 		struct pollfd pf = { 0 };
 		pf.fd = fd;
 		pf.events = ( POLLOUT | POLLERR | POLLHUP );
+
+		//监听可读事件
 		poll( &pf,1,timeout );
 
 		writeret = g_sys_write_func( fd,(const char*)buf + wrotelen,nbyte - wrotelen );
@@ -595,7 +607,6 @@ extern int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int
 */
 int poll(struct pollfd fds[], nfds_t nfds, int timeout)
 {
-
 	HOOK_SYS_FUNC( poll );
 
 	if( !co_is_enable_sys_hook() )
@@ -605,7 +616,6 @@ int poll(struct pollfd fds[], nfds_t nfds, int timeout)
 
 	// 在当前线程的epoll上，创建一个超时时间
 	return co_poll_inner( co_get_epoll_ct(),fds,nfds,timeout, g_sys_poll_func);
-
 }
 
 int setsockopt(int fd, int level, int option_name,
@@ -677,6 +687,10 @@ int fcntl(int fildes, int cmd, ...)
 		{
 			int param = va_arg(arg_list,int);
 			int flag = param;
+
+			// 如果开启了系统hook，并且lp不等于null
+			// lp不等于null说明这个fd是被系统hook拦截的
+			// 则将该fd置为O_NONBLOCK
 			if( co_is_enable_sys_hook() && lp )
 			{
 				flag |= O_NONBLOCK;

@@ -3277,6 +3277,8 @@ err:
 	return -1;
 }
 
+// 将一个文件直接加到evbuffer中
+// 这里可能会用到sendfile
 int
 evbuffer_add_file(struct evbuffer *buf, int fd, ev_off_t offset, ev_off_t length)
 {
