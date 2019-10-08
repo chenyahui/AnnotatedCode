@@ -4,7 +4,7 @@
 
 | 项目名称 | 开发语言 | 注释版 | 原地址 | 博客 |
 | ------| ------ | ------ | ------ | ------ |
-| libco | C++ |[注释版](https://github.com/chenyahui/annotated_code/tree/master/libco)| [原地址](https://github.com/Tencent/libco)|暂无 | 
+| libco | C++ |[注释版](https://github.com/chenyahui/annotated_code/tree/master/libco)| [原地址](https://github.com/Tencent/libco)|[微信libco协程库源码分析](http://www.cyhone.com/articles/analysis-of-libco/) | 
 | coroutine | C |[注释版](https://github.com/chenyahui/annotated_code/tree/master/coroutine)|[原地址](https://github.com/cloudwu/coroutine)| [云风coroutine协程库源码分析](http://www.cyhone.com/articles/analysis-of-cloudwu-coroutine/) | 
 | libevent | C |[注释版](https://github.com/chenyahui/annotated_code/tree/master/libevent)| [原地址](https://github.com/libevent/libevent)| 暂无 |
 | sofa-pbrpc | C++ |[注释版](https://github.com/chenyahui/annotated_code/tree/master/sofa-pbrpc)| [原地址](https://github.com/baidu/sofa-pbrpc)|暂无 |
