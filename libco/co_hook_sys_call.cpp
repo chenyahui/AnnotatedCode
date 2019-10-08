@@ -220,6 +220,7 @@ static inline void free_by_fd( int fd )
 	return;
 
 }
+
 int socket(int domain, int type, int protocol)
 {
 	HOOK_SYS_FUNC( socket );
@@ -237,6 +238,8 @@ int socket(int domain, int type, int protocol)
 	rpchook_t *lp = alloc_by_fd( fd );
 	lp->domain = domain;
 	
+	// 在fcntl函数中，会将fd变成非阻塞的
+	// flag |= O_NONBLOCK;
 	fcntl( fd, F_SETFL, g_sys_fcntl_func(fd, F_GETFL,0 ) );
 
 	return fd;
@@ -352,13 +355,16 @@ ssize_t read( int fd, void *buf, size_t nbyte )
 	// 需要提醒的是，该fd会在accept函数或者socket函数时，创建alloc_by_fd(), 并将其fd信息放入数组
 	rpchook_t *lp = get_by_fd( fd );
 
-	// 如果该fd没有提前放入到数组中，即意味着不是被hook的fd
-	// 或者该fd本身就以及是非阻塞的了，
+	// 如果该fd不是被hook得到的，或者 用户主动的把它设置成了非阻塞
+	// 换句话说:
+	// 1. 只要该fd不是hook得到的，直接返回。不管是不是阻塞非阻塞
+	// 2. 如果是被hook得到的，且用户主动设置成了O_NONBLOCK,才直接返回
 	if( !lp || ( O_NONBLOCK & lp->user_flag ) ) 
 	{
 		ssize_t ret = g_sys_read_func( fd,buf,nbyte );
 		return ret;
 	}
+
 
 	// 将读取超时时间转化为毫秒
 	int timeout = ( lp->read_timeout.tv_sec * 1000 ) 
@@ -376,7 +382,8 @@ ssize_t read( int fd, void *buf, size_t nbyte )
 
 	// 以下部分是yield回来之后调用的
 	// 注意，这里实际上没有判断是超时还是什么
-	// 所以需要调用方自行判断EAGAIN/EWOULDBLOCK错误码
+	// 是因为，libco认为在client侧，超时就是直接失败，不需要处理
+	// 用户也不要在代码侧进行EAGAIN和
 	ssize_t readret = g_sys_read_func( fd,(char*)buf ,nbyte );
 
 	if( readret < 0 )
@@ -696,8 +703,11 @@ int fcntl(int fildes, int cmd, ...)
 				flag |= O_NONBLOCK;
 			}
 			ret = g_sys_fcntl_func( fildes,cmd,flag );
+
 			if( 0 == ret && lp )
 			{
+				// 注意这里的user_flag并没有包含libco设置的O_NONBLOCK
+				// 仅仅是用户进行的设置
 				lp->user_flag = param;
 			}
 			break;

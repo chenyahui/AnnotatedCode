@@ -54,10 +54,12 @@ struct stCoEpoll_t;
 */
 struct stCoRoutineEnv_t
 {
-	// 这里实际上维护的是个调用栈，最后一位是当前运行的协程，前一位是当前协程的父协程
+	// 这里实际上维护的是个调用栈
+	// 最后一位是当前运行的协程，前一位是当前协程的父协程(即，resume该协程的协程)
+	// 可以看出来，libco只能支持128层协程的嵌套调用。这个绝对够了
 	stCoRoutine_t *pCallStack[ 128 ]; 
 
-	int iCallStackSize; //记录当前一共创建了多少个协程
+	int iCallStackSize; // 当前调用栈长度
 
 	stCoEpoll_t *pEpoll;  //主要是epoll，作为协程的调度器
 
@@ -352,6 +354,7 @@ struct stCoEpoll_t
 
 	co_epoll_res *result; 
 };
+
 typedef void (*OnPreparePfn_t)( stTimeoutItem_t *,struct epoll_event &ev, stTimeoutItemLink_t *active );
 typedef void (*OnProcessPfn_t)( stTimeoutItem_t *);
 
@@ -529,6 +532,7 @@ inline void TakeAllTimeout( stTimeout_t *apTimeout,unsigned long long allNow,stT
 	apTimeout->ullStart = allNow;
 	apTimeout->llStartIdx += cnt - 1;
 }
+
 /**
 * 协程回调函数的wrapper
 */
@@ -543,7 +547,8 @@ static int CoRoutineFunc( stCoRoutine_t *co,void * )
 	co->cEnd = 1;
 
 	stCoRoutineEnv_t *env = co->env;
-
+	
+	// 切出
 	co_yield_env( env );
 	return 0;
 }

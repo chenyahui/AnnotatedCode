@@ -83,14 +83,18 @@ static void *readwrite_routine( void *arg )
 
 		for(;;)
 		{
+			// 将该fd的可读事件，注册到epoll中
+			// co_accept里面libco并没有将其设置为 O_NONBLOCK
+			// 是用户主动设置的 O_NONBLOCK
+			// 所以read函数不走hook逻辑，需要自行进行poll切出
 			struct pollfd pf = { 0 };
 			pf.fd = fd;
 			pf.events = (POLLIN|POLLERR|POLLHUP);
-
-			// 将该fd的可读事件，注册到epoll中
+			
 			co_poll( co_get_epoll_ct(),&pf,1,1000);
 
-			// 当超时或者可读事件到达时，
+			// 当超时或者可读事件到达时，进行read。所以read不一定成功
+			// 这里的read，直接是系统函数
 			int ret = read( fd,buf,sizeof(buf) );
 
 			// 读多少就写多少
@@ -156,7 +160,9 @@ static void *accept_routine( void * )
 			continue;
 		}
 
+		// 这里需要手动将其变成非阻塞的
 		SetNonBlock( fd );
+
 		task_t *co = g_readwrite.top();
 		co->fd = fd;
 		g_readwrite.pop();
