@@ -701,13 +701,11 @@ void co_yield_env( stCoRoutineEnv_t *env )
 	// 这里直接取了iCallStackSize - 2，那么万一icallstacksize < 2呢？
 	// 所以这里实际上有个约束，就是co_yield之前必须先co_resume, 这样就不会造成这个问题了
 
+	// last就是 找到上次调用co_resume(curr)的协程
 	stCoRoutine_t *last = env->pCallStack[ env->iCallStackSize - 2 ];
 
 	// 当前栈
 	stCoRoutine_t *curr = env->pCallStack[ env->iCallStackSize - 1 ];
-
-	// last就是 找到上次调用co_resume(curr)的协程
-
 
 	env->iCallStackSize--;
 

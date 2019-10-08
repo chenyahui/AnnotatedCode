@@ -34,11 +34,13 @@ struct stShareStack_t;
 */
 struct stCoRoutineAttr_t
 {
-	int stack_size;
+	int stack_size; // 如果是共享栈模式，则该只不用指定。如果不是共享栈模式，则必需执行
 	stShareStack_t*  share_stack;
 	stCoRoutineAttr_t()
 	{
-		stack_size = 128 * 1024;
+		// 默认是128*1024
+		stack_size = 128 * 1024; 
+		// 默认不是共享栈
 		share_stack = NULL;
 	}
 }__attribute__ ((packed));
