@@ -1,3 +1,9 @@
+# muduo注释版
+本仓库是本人阅读muduo源码时，对muduo顺手做了一些注释，希望能对大家所有帮助。
+
+- [muduo原仓库](https://github.com/chenshuo/muduo)
+- [muduo源码剖析](https://www.cyhone.com/articles/analysis-of-muduo/)
+
 Muduo is a multithreaded C++ network library based on
 the reactor pattern.
 It runs on Linux with kernel version >= 2.6.28.

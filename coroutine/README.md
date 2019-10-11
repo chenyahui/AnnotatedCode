@@ -1,5 +1,7 @@
-此库为coroutine注释版, 里面详细写了本人阅读代码的注释和心得。
-总体coroutine的原理分析，可以查看博客[云风coroutine协程库源码分析](http://www.cyhone.com/articles/analysis-of-cloudwu-coroutine/)
+# coroutine注释版
+本仓库是本人阅读libco源码时，对libco顺手做了一些注释，希望能对大家所有帮助。
+- [coroutine原仓库](https://github.com/cloudwu/coroutine)
+- [云风coroutine协程库源码分析](https://www.cyhone.com/articles/analysis-of-cloudwu-coroutine/)
 
 It's an asymmetric coroutine library (like lua).
 
