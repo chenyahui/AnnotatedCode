@@ -391,11 +391,13 @@ func (lim *Limiter) advance(now time.Time) (newNow time.Time, newLast time.Time,
 
 	// Avoid making delta overflow below when last is very old.
 	// maxElapsed表示，将Token桶填满需要多久
+	// 为什么要拆分两步做，是为了防止后面的delta溢出
+	// 因为默认情况下，last为0，此时delta算出来的，会非常大
 	maxElapsed := lim.limit.durationFromTokens(float64(lim.burst) - lim.tokens)
-	
+
 	// elapsed 表示从当前到上次一共过去了多久
 	// 当然了，elapsed不能大于将桶填满的时间
-	elapsed := now.Sub(last) 
+	elapsed := now.Sub(last)
 	if elapsed > maxElapsed {
 		elapsed = maxElapsed
 	}
@@ -426,6 +428,9 @@ func (limit Limit) durationFromTokens(tokens float64) time.Duration {
 func (limit Limit) tokensFromDuration(d time.Duration) float64 {
 	// Split the integer and fractional parts ourself to minimize rounding errors.
 	// See golang.org/issues/34861.
+	// 如果是用d.Seconds() * float64(limit), 因为d.Seconds是float64的。因此会造成精度的损失。
+	// time.Duration是int64类型的，表示纳秒
+	// time.Second
 	sec := float64(d/time.Second) * float64(limit)
 	nsec := float64(d%time.Second) * float64(limit)
 	return sec + nsec/1e9
