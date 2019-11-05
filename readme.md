@@ -10,3 +10,4 @@
 | sofa-pbrpc | C++ |[注释版](https://github.com/chenyahui/annotated_code/tree/master/sofa-pbrpc)| [原地址](https://github.com/baidu/sofa-pbrpc)|暂无 |
 | muduo | C++ |[注释版](https://github.com/chenyahui/annotated_code/tree/master/muduo)|[原地址](https://github.com/chenshuo/muduo) |[muduo源码剖析](http://www.cyhone.com/articles/analysis-of-muduo/) |
 | flinter | C++| [注释版](https://github.com/chenyahui/annotated_code/tree/master/flinter) |[原地址](https://github.com/yiyuanzhong/flinter) |暂无|
+| go/x/time/rate| Golang |[注释版](https://github.com/chenyahui/AnnotatedCode/tree/master/go/x/time)|[原地址](https://github.com/golang/time)|[Golang限流器time/rate实现剖析](https://www.cyhone.com/articles/analisys-of-golang-rate/)|

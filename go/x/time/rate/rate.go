@@ -167,7 +167,10 @@ func (r *Reservation) CancelAt(now time.Time) {
 	// calculate tokens to restore
 	// The duration between lim.lastEvent and r.timeToAct tells us how many tokens were reserved
 	// after r was obtained. These tokens should not be restored.
+	// 为什么新分配的就不算呢？
 	restoreTokens := float64(r.tokens) - r.limit.tokensFromDuration(r.lim.lastEvent.Sub(r.timeToAct))
+
+	// 当小于0，表示：
 	if restoreTokens <= 0 {
 		return
 	}
@@ -178,9 +181,12 @@ func (r *Reservation) CancelAt(now time.Time) {
 	if burst := float64(r.lim.burst); tokens > burst {
 		tokens = burst
 	}
+
 	// update state
-	r.lim.last = now
+	r.lim.last = now // 这一点也很关键
 	r.lim.tokens = tokens
+
+	// 如果都相等，说明跟没消费一样。直接还原成上次的状态吧
 	if r.timeToAct == r.lim.lastEvent {
 		prevEvent := r.timeToAct.Add(r.limit.durationFromTokens(float64(-r.tokens)))
 		if !prevEvent.Before(now) {
