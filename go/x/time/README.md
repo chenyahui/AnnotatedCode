@@ -1,3 +1,9 @@
+# x/time/rate注释版
+本仓库是本人阅读x/time/rate源码时，对x/time/rate顺手做了一些注释，希望能对大家所有帮助。
+
+- [x/time/rate原仓库](https://github.com/golang/time)
+- [Golang限流器time/rate实现剖析](https://www.cyhone.com/articles/analisys-of-golang-rate/)
+
 # Go Time
 
 This repository provides supplementary Go time packages.
