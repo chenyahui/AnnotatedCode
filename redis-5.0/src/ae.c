@@ -69,7 +69,7 @@ aeEventLoop *aeCreateEventLoop(int setsize) {
     eventLoop->fired = zmalloc(sizeof(aeFiredEvent)*setsize);
     if (eventLoop->events == NULL || eventLoop->fired == NULL) goto err;
     eventLoop->setsize = setsize;
-    eventLoop->lastTime = time(NULL);
+    eventLoop->lastTime = time(NULL); // 初始化为当前时刻 单位秒
     eventLoop->timeEventHead = NULL;
     eventLoop->timeEventNextId = 0;
     eventLoop->stop = 0;
@@ -77,8 +77,13 @@ aeEventLoop *aeCreateEventLoop(int setsize) {
     eventLoop->beforesleep = NULL;
     eventLoop->aftersleep = NULL;
     if (aeApiCreate(eventLoop) == -1) goto err;
+
     /* Events with mask == AE_NONE are not set. So let's initialize the
      * vector with it. */
+    // 初始化每个event的mask为AE_NONE
+    // 有两个用处：
+    // 1. AE_NONE为0，代表无事件
+    // 2. epoll_ctl之前，会根据事件是否为AE_NONE，来决定是MOD还是ADD
     for (i = 0; i < setsize; i++)
         eventLoop->events[i].mask = AE_NONE;
     return eventLoop;
@@ -122,6 +127,7 @@ int aeResizeSetSize(aeEventLoop *eventLoop, int setsize) {
     return AE_OK;
 }
 
+// 销毁一个eventloop
 void aeDeleteEventLoop(aeEventLoop *eventLoop) {
     aeApiFree(eventLoop);
     zfree(eventLoop->events);
@@ -129,6 +135,7 @@ void aeDeleteEventLoop(aeEventLoop *eventLoop) {
     zfree(eventLoop);
 }
 
+// 用来停止aeMain
 void aeStop(aeEventLoop *eventLoop) {
     eventLoop->stop = 1;
 }
@@ -161,9 +168,19 @@ int aeCreateFileEvent(aeEventLoop *eventLoop, int fd, int mask,
     return AE_OK;
 }
 
+/**
+ * 从eventloop中删除对fd的指定事件的监听
+ * 注意并不是把fd的所有事件监听都从eventloop中移除
+ * 而是仅移除mask对应的事件
+ * @param eventloop 
+ * @param fd  要移除的fd
+ * @param mask 要移除的事件
+ */ 
 void aeDeleteFileEvent(aeEventLoop *eventLoop, int fd, int mask)
 {
+    // fd不合法
     if (fd >= eventLoop->setsize) return;
+
     aeFileEvent *fe = &eventLoop->events[fd];
     if (fe->mask == AE_NONE) return;
 
@@ -172,6 +189,7 @@ void aeDeleteFileEvent(aeEventLoop *eventLoop, int fd, int mask)
     if (mask & AE_WRITABLE) mask |= AE_BARRIER;
 
     aeApiDelEvent(eventLoop, fd, mask);
+
     fe->mask = fe->mask & (~mask);
     if (fd == eventLoop->maxfd && fe->mask == AE_NONE) {
         /* Update the max fd */
@@ -190,6 +208,11 @@ int aeGetFileEvents(aeEventLoop *eventLoop, int fd) {
     return fe->mask;
 }
 
+/**
+ * 获取当前的时间
+ * @param seconds ref 当前时间的秒部分
+ * @param milliseconds ref 当前时间的毫秒部分
+ */ 
 static void aeGetTime(long *seconds, long *milliseconds)
 {
     struct timeval tv;
@@ -236,7 +259,8 @@ long long aeCreateTimeEvent(aeEventLoop *eventLoop, long long milliseconds,
     if (te == NULL) return AE_ERR;
     te->id = id;
 
-    // 计算该事件
+    // milliseconds仅仅是一个间隔
+    // when_sec和when_ms代表事件触发的具体时刻
     aeAddMillisecondsToNow(milliseconds,&te->when_sec,&te->when_ms);
 
     te->timeProc = proc;
@@ -252,6 +276,8 @@ long long aeCreateTimeEvent(aeEventLoop *eventLoop, long long milliseconds,
 
 int aeDeleteTimeEvent(aeEventLoop *eventLoop, long long id)
 {
+    // 并不是直接删除，而是先把它标记为AE_DELETED_EVENT_ID
+    // 所以，这个事件还是可以触发的
     aeTimeEvent *te = eventLoop->timeEventHead;
     while(te) {
         if (te->id == id) {
@@ -304,6 +330,8 @@ static int processTimeEvents(aeEventLoop *eventLoop) {
      * events to be processed ASAP when this happens: the idea is that
      * processing events earlier is less dangerous than delaying them
      * indefinitely, and practice suggests it is. */
+
+    // 如果小于lastTime, 说明时间可能被调整了
     if (now < eventLoop->lastTime) {
         te = eventLoop->timeEventHead;
         while(te) {
@@ -340,11 +368,16 @@ static int processTimeEvents(aeEventLoop *eventLoop) {
          * add new timers on the head, however if we change the implementation
          * detail, this check may be useful again: we keep it here for future
          * defense. */
+        // 翻译下：有可能在超时事件的callback中，又添加了超时事件，但是我们不处理
+        // 不过目前这个检查是无效的，因为新的超时事件都是插在了头部，所以即使新产生了超时事件
+        // 这个检查也检查不出来，不过留着吧，万一以后有用呢
         if (te->id > maxId) {
             te = te->next;
             continue;
         }
+
         aeGetTime(&now_sec, &now_ms);
+
         if (now_sec > te->when_sec ||
             (now_sec == te->when_sec && now_ms >= te->when_ms))
         {
@@ -353,6 +386,8 @@ static int processTimeEvents(aeEventLoop *eventLoop) {
             id = te->id;
             retval = te->timeProc(eventLoop, id, te->clientData);
             processed++;
+
+            // 根据timeProc的返回值，来决定要不要删除这个事件
             if (retval != AE_NOMORE) {
                 aeAddMillisecondsToNow(retval,&te->when_sec,&te->when_ms);
             } else {
@@ -377,7 +412,10 @@ static int processTimeEvents(aeEventLoop *eventLoop) {
  * if flags has AE_CALL_AFTER_SLEEP set, the aftersleep callback is called.
  * the events that's possible to process without to wait are processed.
  *
- * The function returns the number of events processed. */
+ * The function returns the number of events processed. 
+ * 
+ * 用来处理单次事件循环
+ */
 int aeProcessEvents(aeEventLoop *eventLoop, int flags)
 {
     int processed = 0, numevents;
@@ -395,8 +433,11 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
         aeTimeEvent *shortest = NULL;
         struct timeval tv, *tvp;
 
+        // 如果监听了超时事件，则取出最近的一次超时事件
         if (flags & AE_TIME_EVENTS && !(flags & AE_DONT_WAIT))
             shortest = aeSearchNearestTimer(eventLoop);
+
+        // 取出的目的是为了给epoll设置最大超时时间，以免epoll一直阻塞在哪里。
         if (shortest) {
             long now_sec, now_ms;
 
@@ -436,7 +477,8 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
         /* After sleep callback. */
         if (eventLoop->aftersleep != NULL && flags & AE_CALL_AFTER_SLEEP)
             eventLoop->aftersleep(eventLoop);
-
+        
+        // 分别处理每个事件
         for (j = 0; j < numevents; j++) {
             aeFileEvent *fe = &eventLoop->events[eventLoop->fired[j].fd];
             int mask = eventLoop->fired[j].mask;
@@ -516,6 +558,7 @@ int aeWait(int fd, int mask, long long milliseconds) {
     }
 }
 
+// 事件循环
 void aeMain(aeEventLoop *eventLoop) {
     eventLoop->stop = 0;
     while (!eventLoop->stop) {

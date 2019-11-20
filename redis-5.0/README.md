@@ -1,3 +1,9 @@
+# Redis注释版
+本仓库是本人阅读Redis源码时，对Redis顺手做了一些注释，希望能对大家所有帮助。
+
+- [Redis原仓库](https://github.com/antirez/redis)
+- [Redis事件循环器(AE)实现剖析](https://www.cyhone.com/articles/analysis-of-redis-ae/)
+
 This README is just a fast *quick start* document. You can find more detailed documentation at [redis.io](https://redis.io).
 
 What is Redis?
