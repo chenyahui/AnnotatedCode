@@ -114,6 +114,7 @@ static int epoll_nochangelist_add(struct event_base *base, evutil_socket_t fd,
 static int epoll_nochangelist_del(struct event_base *base, evutil_socket_t fd,
     short old, short events, void *p);
 
+// epoll的eventop分为两个，一个是普通的，一个是带changelist的
 const struct eventop epollops = {
 	"epoll",
 	epoll_init,
@@ -373,6 +374,13 @@ epoll_apply_changes(struct event_base *base)
 }
 
 // 不使用changelist的时候的epoll_add
+/*
+@base
+@fd
+@old
+@events
+@p
+*/
 static int
 epoll_nochangelist_add(struct event_base *base, evutil_socket_t fd,
     short old, short events, void *p)
@@ -382,7 +390,7 @@ epoll_nochangelist_add(struct event_base *base, evutil_socket_t fd,
 	ch.old_events = old;
 	ch.read_change = ch.write_change = ch.close_change = 0;
 
-	// 判断读写事件是否需要修改
+	// 判断读写事件是否需要修改, 为什么会对ET进行单独判断。
 	if (events & EV_WRITE)
 	{
 		ch.write_change = EV_CHANGE_ADD |

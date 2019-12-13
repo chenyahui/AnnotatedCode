@@ -31,8 +31,8 @@
   Here are the values we're masking off to decide what operations to do.
   Note that since EV_READ|EV_WRITE.
 
-  Note also that this table is a little sparse, since ADD+DEL is
-  nonsensical ("xxx" in the list below.)
+  Note also that this table is a little sparse(稀疏), since ADD+DEL is
+  nonsensical(无意义的) ("xxx" in the list below.)
 
   Note also also that we are shifting old_events by only 5 bits, since
   EV_READ is 2 and EV_WRITE is 4.

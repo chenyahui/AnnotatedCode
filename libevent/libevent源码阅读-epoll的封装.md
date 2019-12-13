@@ -16,8 +16,11 @@ epoll_create(32000)
 ```c
 epoll_create1(EPOLL_CLOEXEC);
 ```
+create1和create的区别在哪里？
 
 timerfd
+
+changelist的危害
 
 # 
 
