@@ -492,7 +492,7 @@ int AddTimeout( stTimeout_t *apTimeout,stTimeoutItem_t *apItem ,unsigned long lo
 * 以allNow参数为截止时间，取出所有的超时事件
 *
 * @param apTimeout (in) 超时管理器
-* @param allNow (in)  截止时间
+* @param allNow (in)  截止时间 也就是当前时刻
 * @param apResult (out) 最终的超时事件结果会放入此表中
 */
 inline void TakeAllTimeout( stTimeout_t *apTimeout,unsigned long long allNow,stTimeoutItemLink_t *apResult )
@@ -954,7 +954,7 @@ void OnPollPreparePfn( stTimeoutItem_t * ap,struct epoll_event &e,stTimeoutItemL
 /*
 * libco的核心调度
 * 在此处调度三种事件：
-* 1. 被hook的io事件，该io事件是通过co_pool_inner注册进来的
+* 1. 被hook的io事件，该io事件是通过co_poll_inner注册进来的
 * 2. 超时事件
 * 3. 用户主动使用poll的事件
 * 所以，如果用户用到了三种事件，必须得配合使用co_eventloop
@@ -1065,6 +1065,8 @@ stCoEpoll_t *AllocEpoll()
 	stCoEpoll_t *ctx = (stCoEpoll_t*)calloc( 1,sizeof(stCoEpoll_t) );
 
 	ctx->iEpollFd = co_epoll_create( stCoEpoll_t::_EPOLL_SIZE );
+	
+	// 单位是毫秒，只能一分钟
 	ctx->pTimeout = AllocTimeout( 60 * 1000 );
 	
 	ctx->pstActiveList = (stTimeoutItemLink_t*)calloc( 1,sizeof(stTimeoutItemLink_t) );
@@ -1213,8 +1215,6 @@ int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeou
 	// 获取当前时间
 	unsigned long long now = GetTickMS();
 
-	// 超时时间, 计算出绝对时间
-	// 如果timeout == 0呢，这里为什么没有考虑到？
 	arg.ullExpireTime = now + timeout;	
 	
 	// 将其添加到超时链表中
