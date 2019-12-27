@@ -83,6 +83,7 @@ void linkClient(client *c) {
     raxInsert(server.clients_index,(unsigned char*)&id,sizeof(id),c,NULL);
 }
 
+// 创建client，并将fd假如到事件循环中
 client *createClient(int fd) {
     client *c = zmalloc(sizeof(client));
 
@@ -95,6 +96,8 @@ client *createClient(int fd) {
         anetEnableTcpNoDelay(NULL,fd);
         if (server.tcpkeepalive)
             anetKeepAlive(NULL,fd,server.tcpkeepalive);
+        
+        // 将fd的可读事件加入到事件循环中
         if (aeCreateFileEvent(server.el,fd,AE_READABLE,
             readQueryFromClient, c) == AE_ERR)
         {
@@ -731,6 +734,7 @@ static void acceptCommonHandler(int fd, int flags, char *ip) {
     c->flags |= flags;
 }
 
+// 当有新连接到来的时候，回调这个callback
 void acceptTcpHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
     int cport, cfd, max = MAX_ACCEPTS_PER_CALL;
     char cip[NET_IP_STR_LEN];

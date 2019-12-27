@@ -1,0 +1,3 @@
+[submodule "beats"]
+	path = beats
+	url = https://github.com/chenyahui/beats-annotated

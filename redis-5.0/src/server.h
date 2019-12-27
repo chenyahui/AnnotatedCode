@@ -721,6 +721,7 @@ typedef struct readyList {
 
 /* With multiplexing we need to take per-client state.
  * Clients are taken in a linked list. */
+// 一个client对应一个连接
 typedef struct client {
     uint64_t id;            /* Client incremental unique ID. */
     int fd;                 /* Client socket. */
