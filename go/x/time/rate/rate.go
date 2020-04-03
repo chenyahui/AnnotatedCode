@@ -168,9 +168,12 @@ func (r *Reservation) CancelAt(now time.Time) {
 	// The duration between lim.lastEvent and r.timeToAct tells us how many tokens were reserved
 	// after r was obtained. These tokens should not be restored.
 	// 为什么新分配的就不算呢？
+	// 因为可以cancel表示该Event尚未发生，如果已经发生，则在前面的if分支就return了;
+	// 那么后面继续申请的Event.timeToAct必定大于当前的r.timeToAct，也是预支的;
+	// 那么归还当前的token时，需要把已经预支的那部分除去，因为已经算是预消费了，不能再给后面申请的Event使用
 	restoreTokens := float64(r.tokens) - r.limit.tokensFromDuration(r.lim.lastEvent.Sub(r.timeToAct))
 
-	// 当小于0，表示：
+	// 当小于0，表示已经都预支完了，不能归还了
 	if restoreTokens <= 0 {
 		return
 	}
