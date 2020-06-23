@@ -1,3 +1,6 @@
 [submodule "beats"]
 	path = beats
 	url = https://github.com/chenyahui/beats-annotated
+[submodule "go-1.13"]
+	path = go-1.13
+	url = https://github.com/chenyahui/go-1.13-annotated
