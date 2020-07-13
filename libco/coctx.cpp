@@ -106,8 +106,9 @@ int coctx_make( coctx_t *ctx,coctx_pfn_t pfn,const void *s,const void *s1 )
 
 	memset(ctx->regs, 0, sizeof(ctx->regs));
 
+	// CPU每次执行指令都要先读取EIP寄存器的值，然后定位EIP指向的内存地址（偏移地址），并且读取汇编指令，最后执行
 	ctx->regs[ kESP ] = (char*)(sp) - sizeof(void*);
-	ctx->regs[ kEIP ] = (char*)pfn;
+	ctx->regs[ kEIP ] = (char*)pfn; 
 
 	return 0;
 }

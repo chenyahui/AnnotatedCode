@@ -84,7 +84,7 @@ coctx_swap:
 	pushq %r12   // r12 -> regs[3]
 	pushq %r13    // r13 -> regs[2]
 	pushq %r14   // r14 -> regs[1]
-	pushq %r15   // r15 -> regs[0]
+	pushq %r15   // r15 -> regs[0]  // r15是程序计数器
 	
 	// 截止到此，所有的协程上下文保存成功 
 

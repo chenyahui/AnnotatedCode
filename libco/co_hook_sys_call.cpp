@@ -357,8 +357,8 @@ ssize_t read( int fd, void *buf, size_t nbyte )
 
 	// 如果该fd不是被hook得到的，或者 用户主动的把它设置成了非阻塞
 	// 换句话说:
-	// 1. 只要该fd不是hook得到的，直接返回。不管是不是阻塞非阻塞
-	// 2. 如果是被hook得到的，且用户主动设置成了O_NONBLOCK,才直接返回
+	// 1. 只要该fd不是hook得到的，直接用系统原生的read。不管是不是阻塞非阻塞
+	// 2. 如果是被hook得到的，且用户主动设置成了O_NONBLOCK, 直接用系统原生的read
 	if( !lp || ( O_NONBLOCK & lp->user_flag ) ) 
 	{
 		ssize_t ret = g_sys_read_func( fd,buf,nbyte );
@@ -375,7 +375,8 @@ ssize_t read( int fd, void *buf, size_t nbyte )
 	pf.fd = fd;
 	pf.events = ( POLLIN | POLLERR | POLLHUP );
 
-	// 最终会调用, co_poll_inner ，将其注册到epoll中
+	// 最终会调用, co_poll_inner ，将其注册到epoll中。
+	// 注意：直到这个时候才把它放入到epoll中
 	// 同时调用co_yield，让出协程
 	int pollret = poll( &pf,1,timeout );
 

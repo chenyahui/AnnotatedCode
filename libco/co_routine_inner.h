@@ -69,10 +69,10 @@ struct stCoRoutine_t
 	void *pvEnv;
 
 	//char sRunStack[ 1024 * 128 ];
-	stStackMem_t* stack_mem; 
+	stStackMem_t* stack_mem; // 栈内存
 
 
-	//save satck buffer while confilct on same stack_buffer;
+	//save satck buffer while conflict on same stack_buffer;
 	char* stack_sp; 
 	unsigned int save_size; // save_buffer的长度
 	char* save_buffer; // 当协程挂起时，栈的内容会栈暂存到save_buffer中

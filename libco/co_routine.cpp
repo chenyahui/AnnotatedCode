@@ -548,7 +548,7 @@ static int CoRoutineFunc( stCoRoutine_t *co,void * )
 
 	stCoRoutineEnv_t *env = co->env;
 	
-	// 切出
+	// 函数结束时，将会
 	co_yield_env( env );
 	return 0;
 }
@@ -612,8 +612,9 @@ struct stCoRoutine_t *co_create_env( stCoRoutineEnv_t * env, const stCoRoutineAt
 
 	lp->stack_mem = stack_mem;
 
-	lp->ctx.ss_sp = stack_mem->stack_buffer;
-	lp->ctx.ss_size = at.stack_size;
+	// 设置该协程的context
+	lp->ctx.ss_sp = stack_mem->stack_buffer; // 栈地址
+	lp->ctx.ss_size = at.stack_size; // 栈大小
 
 	lp->cStart = 0;
 	lp->cEnd = 0;
@@ -621,6 +622,7 @@ struct stCoRoutine_t *co_create_env( stCoRoutineEnv_t * env, const stCoRoutineAt
 	lp->cEnableSysHook = 0;	// 默认不开启hook
 	lp->cIsShareStack = at.share_stack != NULL;
 
+	// 仅在共享栈的时候有意义
 	lp->save_size = 0;
 	lp->save_buffer = NULL;
 
@@ -697,7 +699,7 @@ void co_resume( stCoRoutine_t *co )
 
 /*
 *
-* 主动将协程让给其他协程
+* 主动将当前运行的协程挂起，并恢复到上一层的协程
 *
 * @param env 协程管理器 
 */
@@ -736,6 +738,7 @@ void save_stack_buffer(stCoRoutine_t* occupy_co)
 {
 	///copy out
 	stStackMem_t* stack_mem = occupy_co->stack_mem;
+	// 计算出栈的大小
 	int len = stack_mem->stack_bp - occupy_co->stack_sp;
 
 	if (occupy_co->save_buffer)
@@ -746,13 +749,13 @@ void save_stack_buffer(stCoRoutine_t* occupy_co)
 	occupy_co->save_buffer = (char*)malloc(len); //malloc buf;
 	occupy_co->save_size = len;
 
+	// 将当前运行栈的内容，拷贝到save_buffer中
 	memcpy(occupy_co->save_buffer, occupy_co->stack_sp, len);
 }
 
 /*
 * 1. 将当前的运行上下文保存到curr中
 * 2. 将当前的运行上下文替换为pending_co中的上下文
-* 3. curr的上下文呢？
 
 * @param curr
 * @param pending_co 
@@ -778,7 +781,8 @@ void co_swap(stCoRoutine_t* curr, stCoRoutine_t* pending_co)
 		env->pending_co = pending_co; 
 		
 		//get last occupy co on the same stack mem
-		// 获取最后一个使用该共享栈的协程
+		// occupy_co指的是，和pending_co共同使用一个共享栈的协程
+		// 把它取出来是为了先把occupy_co的内存保存起来
 		stCoRoutine_t* occupy_co = pending_co->stack_mem->occupy_co;
 		
 		//set pending co to occupy thest stack mem;
@@ -789,25 +793,31 @@ void co_swap(stCoRoutine_t* curr, stCoRoutine_t* pending_co)
 		
 		if (occupy_co && occupy_co != pending_co)
 		{  
-			// 如果上一个使用协程不为空,则需要把它的栈内容保存起来。
+			// 如果上一个使用协程不为空, 则需要把它的栈内容保存起来。
 			save_stack_buffer(occupy_co);
 		}
 	}
 
-	//swap context
+	// swap context
 	coctx_swap(&(curr->ctx),&(pending_co->ctx) );
+
+	// 这个地方很绕，上一步coctx_swap会进入到pending_co的协程环境中运行
+	// 到这一步，已经yield回此协程了，才会执行下面的语句
+	// 而yield回此协程之前，env->pending_co会被上一层协程设置为此协程
+	// 因此可以顺利执行: 将之前保存起来的栈内容，恢复到运行栈上
 
 	//stack buffer may be overwrite, so get again;
 	stCoRoutineEnv_t* curr_env = co_get_curr_thread_env();
 	stCoRoutine_t* update_occupy_co =  curr_env->occupy_co;
 	stCoRoutine_t* update_pending_co = curr_env->pending_co;
 	
+	// 将栈的内容恢复，如果不是共享栈的话，每个协程都有自己独立的栈空间，则不用恢复。
 	if (update_occupy_co && update_pending_co && update_occupy_co != update_pending_co)
 	{
 		// resume stack buffer
-		// 将栈的内容恢复，如果不是共享栈的话，每个协程都有自己独立的栈空间，则不用恢复。
 		if (update_pending_co->save_buffer && update_pending_co->save_size > 0)
 		{
+			// 将之前保存起来的栈内容，恢复到运行栈上
 			memcpy(update_pending_co->stack_sp, update_pending_co->save_buffer, update_pending_co->save_size);
 		}
 	}
@@ -907,7 +917,7 @@ void co_init_curr_thread_env()
 }
 
 
-// 获取当前线程的 运行环境
+// 获取当前线程的协程管理器
 stCoRoutineEnv_t *co_get_curr_thread_env()
 {
 	return g_arrCoEnvPerThread[ GetPid() ];

@@ -37,7 +37,6 @@ struct coctx_t
 #endif
 	size_t ss_size; // 栈空间的大小
 	char *ss_sp;   // 栈空间
-	
 };
 
 int coctx_init( coctx_t *ctx );

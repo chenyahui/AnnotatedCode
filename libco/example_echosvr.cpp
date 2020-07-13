@@ -93,8 +93,7 @@ static void *readwrite_routine( void *arg )
 			
 			co_poll( co_get_epoll_ct(),&pf,1,1000);
 
-			// 当超时或者可读事件到达时，进行read。所以read不一定成功
-			// 这里的read，直接是系统函数
+			// 当超时或者可读事件到达时，进行read。所以read不一定成功，有可能是超时造成的
 			int ret = read( fd,buf,sizeof(buf) );
 
 			// 读多少就写多少
