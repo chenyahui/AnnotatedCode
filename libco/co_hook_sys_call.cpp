@@ -293,6 +293,7 @@ int connect(int fd, const struct sockaddr *address, socklen_t address_len)
 	int pollret = 0;
 	struct pollfd pf = { 0 };
 
+	// 75s是内核默认的超时时间
 	for(int i=0;i<3;i++) //25s * 3 = 75s
 	{
 		memset( &pf,0,sizeof(pf) );
@@ -355,7 +356,7 @@ ssize_t read( int fd, void *buf, size_t nbyte )
 	// 需要提醒的是，该fd会在accept函数或者socket函数时，创建alloc_by_fd(), 并将其fd信息放入数组
 	rpchook_t *lp = get_by_fd( fd );
 
-	// 如果该fd不是被hook得到的，或者 用户主动的把它设置成了非阻塞
+	// 如果该fd不是被hook得到的，或者用户主动的把它设置成了非阻塞, 则直接调用原生的read，而不再hook
 	// 换句话说:
 	// 1. 只要该fd不是hook得到的，直接用系统原生的read。不管是不是阻塞非阻塞
 	// 2. 如果是被hook得到的，且用户主动设置成了O_NONBLOCK, 直接用系统原生的read
@@ -367,6 +368,7 @@ ssize_t read( int fd, void *buf, size_t nbyte )
 
 
 	// 将读取超时时间转化为毫秒
+	// 这里的超时时间，默认是1s。但是可以通过setsockopt(SO_RCVTIMEO)来设置
 	int timeout = ( lp->read_timeout.tv_sec * 1000 ) 
 				+ ( lp->read_timeout.tv_usec / 1000 );
 
@@ -382,9 +384,7 @@ ssize_t read( int fd, void *buf, size_t nbyte )
 
 
 	// 以下部分是yield回来之后调用的
-	// 注意，这里实际上没有判断是超时还是什么
-	// 是因为，libco认为在client侧，超时就是直接失败，不需要处理
-	// 用户也不要在代码侧进行EAGAIN和
+	// 有可能是超时回来，也有可能真的是可读时间触发回来的
 	ssize_t readret = g_sys_read_func( fd,(char*)buf ,nbyte );
 
 	if( readret < 0 )
@@ -639,6 +639,7 @@ int setsockopt(int fd, int level, int option_name,
 
 	if( lp && SOL_SOCKET == level )
 	{
+		// 设置socket的读写超时时间
 		struct timeval *val = (struct timeval*)option_value;
 		if( SO_RCVTIMEO == option_name  ) 
 		{

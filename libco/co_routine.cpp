@@ -509,8 +509,8 @@ inline void TakeAllTimeout( stTimeout_t *apTimeout,unsigned long long allNow,stT
 		return ;
 	}
 
-	// 用当前时间减去最早超时时间，因为每一项代表1ms
-	// 所以cnt刚好就代表了，超时的个数
+	// 用当前时间减去最早超时时间，因为时间轮里面的每一个槽代表了1ms。
+	// 因此cnt刚好就代表了超时的槽数
 	int cnt = allNow - apTimeout->ullStart + 1;
 
 	if( cnt > apTimeout->iItemSize )
