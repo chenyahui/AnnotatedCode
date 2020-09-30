@@ -83,7 +83,7 @@ void linkClient(client *c) {
     raxInsert(server.clients_index,(unsigned char*)&id,sizeof(id),c,NULL);
 }
 
-// 创建client，并将fd假如到事件循环中
+// 创建client，并将fd加入到事件循环中
 client *createClient(int fd) {
     client *c = zmalloc(sizeof(client));
 
