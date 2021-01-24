@@ -212,6 +212,7 @@ func (g *Graph) Populate() error {
 	return nil
 }
 
+// 补全有类型的字段
 func (g *Graph) populateExplicit(o *Object) error {
 	// Ignore named value types.
 	if o.Name != "" && !isStructPtr(o.reflectType) {

@@ -55,6 +55,7 @@ void* Consumer(void* args)
 {
 	co_enable_hook_sys();
 	stEnv_t* env = (stEnv_t*)args;
+	// consumer会一直消费，直到为空后，调用co_cond_timedwait切出协程，等待再次不为空
 	while (true)
 	{
 		if (env->task_queue.empty())
