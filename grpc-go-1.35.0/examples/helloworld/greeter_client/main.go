@@ -31,7 +31,7 @@ import (
 
 // dns解析
 const (
-	address     = "wesure.wx.com:50051"
+	address     = "localhost:50001"
 	defaultName = "world"
 )
 

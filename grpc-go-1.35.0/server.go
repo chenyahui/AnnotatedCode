@@ -1682,6 +1682,7 @@ func (s *Server) Stop() {
 // GracefulStop stops the gRPC server gracefully. It stops the server from
 // accepting new connections and RPCs and blocks until all the pending RPCs are
 // finished.
+// 优雅终止
 func (s *Server) GracefulStop() {
 	s.quit.Fire()
 	defer s.done.Fire()
