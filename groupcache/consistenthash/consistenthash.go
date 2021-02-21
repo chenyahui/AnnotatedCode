@@ -27,9 +27,9 @@ type Hash func(data []byte) uint32
 
 type Map struct {
 	hash     Hash
-	replicas int
-	keys     []int // Sorted
-	hashMap  map[int]string
+	replicas int   // 副本数
+	keys     []int // Sorted 这个就是有序hash环
+	hashMap  map[int]string // hash环上节点的值 -> 对应的节点名字
 }
 
 func New(replicas int, fn Hash) *Map {
@@ -77,7 +77,7 @@ func (m *Map) Get(key string) string {
 	idx := sort.Search(len(m.keys), func(i int) bool { return m.keys[i] >= hash })
 
 	// Means we have cycled back to the first replica.
-	// 如果没有找到
+	// 如果没有找到，则用第一个
 	if idx == len(m.keys) {
 		idx = 0
 	}
