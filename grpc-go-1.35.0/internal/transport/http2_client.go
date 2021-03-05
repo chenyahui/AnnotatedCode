@@ -339,9 +339,11 @@ func newHTTP2Client(connectCtx, ctx context.Context, addr resolver.Address, opts
 		t.kpDormancyCond = sync.NewCond(&t.mu)
 		go t.keepalive()
 	}
+
 	// Start the reader goroutine for incoming message. Each transport has
 	// a dedicated goroutine which reads HTTP2 frame from network. Then it
 	// dispatches the frame to the corresponding stream entity.
+	// 开启一个goroutine，去读回包消息
 	go t.reader()
 
 	// Send connection preface to server.
@@ -1129,6 +1131,7 @@ func (t *http2Client) handlePing(f *http2.PingFrame) {
 	t.controlBuf.put(pingAck)
 }
 
+// 处理服务器端发过来的goaway帧
 func (t *http2Client) handleGoAway(f *http2.GoAwayFrame) {
 	t.mu.Lock()
 	if t.state == closing {
@@ -1304,6 +1307,7 @@ func (t *http2Client) operateHeaders(frame *http2.MetaHeadersFrame) {
 // TODO(zhaoq): currently one reader per transport. Investigate whether this is
 // optimal.
 // TODO(zhaoq): Check the validity of the incoming frame sequence.
+// 单独一个goroutine：客户端负责读取连接上的数据
 func (t *http2Client) reader() {
 	defer close(t.readerDone)
 	// Check the validity of server preface.

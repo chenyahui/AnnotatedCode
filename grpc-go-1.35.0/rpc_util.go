@@ -554,6 +554,7 @@ type parser struct {
 // that the underlying io.Reader must not return an incompatible
 // error.
 func (p *parser) recvMsg(maxReceiveMessageSize int) (pf payloadFormat, msg []byte, err error) {
+	// 先读取固定的5 byte的grpc协议头
 	if _, err := p.r.Read(p.header[:]); err != nil {
 		return 0, nil, err
 	}

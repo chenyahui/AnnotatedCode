@@ -29,6 +29,7 @@ namespace leveldb {
 
 class Slice;
 
+// 批量写入
 class LEVELDB_EXPORT WriteBatch {
  public:
   WriteBatch();

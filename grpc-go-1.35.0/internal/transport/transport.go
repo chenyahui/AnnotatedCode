@@ -107,9 +107,11 @@ func (b *recvBuffer) put(r recvMsg) {
 	if len(b.backlog) == 0 {
 		select {
 		case b.c <- r:
+			// 如果能往channel里面写，则直接写进去
 			b.mu.Unlock()
 			return
 		default:
+			// 否则不写
 		}
 	}
 	b.backlog = append(b.backlog, r)
@@ -452,6 +454,7 @@ func (s *Stream) SetTrailer(md metadata.MD) error {
 	return nil
 }
 
+// 往recvbuffer里面写东西
 func (s *Stream) write(m recvMsg) {
 	s.buf.put(m)
 }
@@ -462,7 +465,10 @@ func (s *Stream) Read(p []byte) (n int, err error) {
 	if er := s.trReader.(*transportReader).er; er != nil {
 		return 0, er
 	}
+
 	s.requestRead(len(p))
+
+	// ReadFull会一直读到buffer满
 	return io.ReadFull(s.trReader, p)
 }
 

@@ -297,7 +297,6 @@ func newControlBuffer(done <-chan struct{}) *controlBuffer {
 
 // throttle blocks if there are too many incomingSettings/cleanupStreams in the
 // controlbuf.
-// 节流阀
 func (c *controlBuffer) throttle() {
 	ch, _ := c.trfChan.Load().(*chan struct{})
 	if ch != nil {
@@ -387,6 +386,8 @@ func (c *controlBuffer) get(block bool) (interface{}, error) {
 			c.mu.Unlock()
 			return h, nil
 		}
+
+		// 列表为空，如果block等于false，则直接返回
 		if !block {
 			c.mu.Unlock()
 			return nil, nil
@@ -513,13 +514,17 @@ func (l *loopyWriter) run() (err error) {
 		}
 	}()
 	for {
+		// 从controlbuf中获取数据
 		it, err := l.cbuf.get(true)
 		if err != nil {
 			return err
 		}
+
+		// 处理各种到来的请求
 		if err = l.handle(it); err != nil {
 			return err
 		}
+
 		if _, err = l.processData(); err != nil {
 			return err
 		}
@@ -702,11 +707,14 @@ func (l *loopyWriter) writeHeader(streamID uint32, endStream bool, hf []hpack.He
 	return nil
 }
 
+// 当需要通过流发送数据的时候，会触发这个handler
 func (l *loopyWriter) preprocessData(df *dataFrame) error {
+	// 找到这个dataframe对应的stream
 	str, ok := l.estdStreams[df.streamID]
 	if !ok {
 		return nil
 	}
+
 	// If we got data for a stream it means that
 	// stream was originated and the headers were sent out.
 	str.itl.enqueue(df)
@@ -750,6 +758,7 @@ func (l *loopyWriter) cleanupStreamHandler(c *cleanupStream) error {
 	return nil
 }
 
+// 仅在客户端调用：当收到服务器端发来的GoAway帧的处理函数
 func (l *loopyWriter) incomingGoAwayHandler(*incomingGoAway) error {
 	if l.side == clientSide {
 		l.draining = true
@@ -760,6 +769,7 @@ func (l *loopyWriter) incomingGoAwayHandler(*incomingGoAway) error {
 	return nil
 }
 
+// 仅在服务器端调用：当服务器端主动调用了goaway
 func (l *loopyWriter) goAwayHandler(g *goAway) error {
 	// Handling of outgoing GoAway is very specific to side.
 	if l.ssGoAwayHandler != nil {

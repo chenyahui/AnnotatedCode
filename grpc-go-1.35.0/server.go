@@ -1698,9 +1698,11 @@ func (s *Server) GracefulStop() {
 		return
 	}
 
+	// 首先关闭监听socket，保证不会有新的连接到来
 	for lis := range s.lis {
 		lis.Close()
 	}
+
 	s.lis = nil
 	if !s.drain {
 		for st := range s.conns {

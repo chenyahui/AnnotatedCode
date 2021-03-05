@@ -233,7 +233,10 @@ func newHTTP2Server(conn net.Conn, config *ServerConfig) (_ ServerTransport, err
 		czData:            new(channelzData),
 		bufferPool:        newBufferPool(),
 	}
+
+	// 初始化controlBuf
 	t.controlBuf = newControlBuffer(t.done)
+
 	if dynamicWindow {
 		t.bdpEst = &bdpEstimator{
 			bdp:               initialWindowSize,
@@ -319,6 +322,7 @@ func (t *http2Server) operateHeaders(frame *http2.MetaHeadersFrame, handle func(
 		return false
 	}
 
+	// 创建一个recvbuffer
 	buf := newRecvBuffer()
 	s := &Stream{
 		id:             streamID,
@@ -430,6 +434,8 @@ func (t *http2Server) operateHeaders(frame *http2.MetaHeadersFrame, handle func(
 	}
 	s.ctxDone = s.ctx.Done()
 	s.wq = newWriteQuota(defaultWriteQuota, s.ctxDone)
+
+	// 设置reader和
 	s.trReader = &transportReader{
 		reader: &recvBufferReader{
 			ctx:        s.ctx,
@@ -457,6 +463,7 @@ func (t *http2Server) operateHeaders(frame *http2.MetaHeadersFrame, handle func(
 // traceCtx attaches trace to ctx and returns the new context.
 // handle:
 // traceCtx:
+// 处理流
 func (t *http2Server) HandleStreams(handle func(*Stream), traceCtx func(context.Context, string) context.Context) {
 	defer close(t.readerDone)
 	for {
@@ -1153,6 +1160,7 @@ func (t *http2Server) Drain() {
 	t.drain(http2.ErrCodeNo, []byte{})
 }
 
+// 发送http2的GOAWAY帧
 func (t *http2Server) drain(code http2.ErrCode, debugData []byte) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -1210,6 +1218,7 @@ func (t *http2Server) outgoingGoAwayHandler(g *goAway) (bool, error) {
 		timer := time.NewTimer(time.Minute)
 		defer timer.Stop()
 		select {
+		// 等待drainChan被关闭，即收到pong
 		case <-t.drainChan:
 		case <-timer.C:
 		case <-t.done:
