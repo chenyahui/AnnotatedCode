@@ -332,6 +332,7 @@ func (c *controlBuffer) executeAndPut(f func(it interface{}) bool, it cbItem) (b
 	c.list.enqueue(it)
 	if it.isTransportResponseFrame() {
 		c.transportResponseFrames++
+		// 如果超过了最大回复的帧
 		if c.transportResponseFrames == maxQueuedTransportResponseFrames {
 			// We are adding the frame that puts us over the threshold; create
 			// a throttling channel.
@@ -377,6 +378,7 @@ func (c *controlBuffer) get(block bool) (interface{}, error) {
 				if c.transportResponseFrames == maxQueuedTransportResponseFrames {
 					// We are removing the frame that put us over the
 					// threshold; close and clear the throttling channel.
+					// 已经不是最大限制了
 					ch := c.trfChan.Load().(*chan struct{})
 					close(*ch)
 					c.trfChan.Store((*chan struct{})(nil))
@@ -758,9 +760,10 @@ func (l *loopyWriter) cleanupStreamHandler(c *cleanupStream) error {
 	return nil
 }
 
-// 仅在客户端调用：当收到服务器端发来的GoAway帧的处理函数
+// 仅在客户端侧调用：当收到服务器端发来的GoAway帧的处理函数
 func (l *loopyWriter) incomingGoAwayHandler(*incomingGoAway) error {
 	if l.side == clientSide {
+		// 设置draining为true
 		l.draining = true
 		if len(l.estdStreams) == 0 {
 			return ErrConnClosing

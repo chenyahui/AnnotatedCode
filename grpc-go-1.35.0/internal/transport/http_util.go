@@ -584,6 +584,8 @@ func newFramer(conn net.Conn, writeBufferSize, readBufferSize int, maxHeaderList
 	if writeBufferSize < 0 {
 		writeBufferSize = 0
 	}
+
+	// 注意，这里的reader直接是net.Conn, framer将直接从tcp连接上读取帧
 	var r io.Reader = conn
 	if readBufferSize > 0 {
 		r = bufio.NewReaderSize(r, readBufferSize)

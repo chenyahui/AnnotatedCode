@@ -778,6 +778,7 @@ func (t *http2Client) CloseStream(s *Stream, err error) {
 	t.closeStream(s, err, rst, rstCode, status.Convert(err), nil, false)
 }
 
+// 关闭流
 func (t *http2Client) closeStream(s *Stream, err error, rst bool, rstCode http2.ErrCode, st *status.Status, mdata map[string][]string, eosReceived bool) {
 	// Set stream status to done.
 	if s.swapState(streamDone) == streamDone {
@@ -1131,9 +1132,11 @@ func (t *http2Client) handlePing(f *http2.PingFrame) {
 	t.controlBuf.put(pingAck)
 }
 
-// 处理服务器端发过来的goaway帧
+// 客户端处理服务器端发过来的goaway帧
 func (t *http2Client) handleGoAway(f *http2.GoAwayFrame) {
 	t.mu.Lock()
+
+	// 如果本身已经在关闭了，那么就不用care这里
 	if t.state == closing {
 		t.mu.Unlock()
 		return
@@ -1143,12 +1146,16 @@ func (t *http2Client) handleGoAway(f *http2.GoAwayFrame) {
 			logger.Infof("Client received GoAway with http2.ErrCodeEnhanceYourCalm.")
 		}
 	}
+
+	// streamid
 	id := f.LastStreamID
+	// 看下是不是客户端创建的流
 	if id > 0 && id%2 != 1 {
 		t.mu.Unlock()
 		t.Close()
 		return
 	}
+
 	// A client can receive multiple GoAways from the server (see
 	// https://github.com/grpc/grpc-go/issues/1387).  The idea is that the first
 	// GoAway will be sent with an ID of MaxInt32 and the second GoAway will be
@@ -1159,6 +1166,7 @@ func (t *http2Client) handleGoAway(f *http2.GoAwayFrame) {
 	// streams. While in case of second GoAway we close all streams created after
 	// the GoAwayId. This way streams that were in-flight while the GoAway from
 	// server was being sent don't get killed.
+	// 客户端可以发送多个GoAway帧
 	select {
 	case <-t.goAway: // t.goAway has been closed (i.e.,multiple GoAways).
 		// If there are multiple GoAways the first one should always have an ID greater than the following ones.
@@ -1168,8 +1176,11 @@ func (t *http2Client) handleGoAway(f *http2.GoAwayFrame) {
 			return
 		}
 	default:
+		// 第一次发送的goaway将会来到这里
 		t.setGoAwayReason(f)
+		// 关闭goaway的channel
 		close(t.goAway)
+		// 往controlBuf里面放一个incomingGoAway，之后loopwriter会处理
 		t.controlBuf.put(&incomingGoAway{})
 		// Notify the clientconn about the GOAWAY before we set the state to
 		// draining, to allow the client to stop attempting to create streams
@@ -1183,6 +1194,8 @@ func (t *http2Client) handleGoAway(f *http2.GoAwayFrame) {
 	if upperLimit == 0 { // This is the first GoAway Frame.
 		upperLimit = math.MaxUint32 // Kill all streams after the GoAway ID.
 	}
+
+	// 逐个关闭activeStream
 	for streamID, stream := range t.activeStreams {
 		if streamID > id && streamID <= upperLimit {
 			// The stream was unprocessed by the server.
@@ -1307,10 +1320,12 @@ func (t *http2Client) operateHeaders(frame *http2.MetaHeadersFrame) {
 // TODO(zhaoq): currently one reader per transport. Investigate whether this is
 // optimal.
 // TODO(zhaoq): Check the validity of the incoming frame sequence.
-// 单独一个goroutine：客户端负责读取连接上的数据
+// 单独一个goroutine：客户端负责读取连接上服务器端传过来的数据
 func (t *http2Client) reader() {
 	defer close(t.readerDone)
+
 	// Check the validity of server preface.
+	// 从tcp上读取一个http2的帧
 	frame, err := t.framer.fr.ReadFrame()
 	if err != nil {
 		t.Close() // this kicks off resetTransport, so must be last before return
@@ -1330,7 +1345,9 @@ func (t *http2Client) reader() {
 
 	// loop to keep reading incoming messages on this transport.
 	for {
+		// http2的一个限流策略，如果超过了最大回复帧，则这里会暂时卡住
 		t.controlBuf.throttle()
+
 		frame, err := t.framer.fr.ReadFrame()
 		if t.keepaliveEnabled {
 			atomic.StoreInt64(&t.lastRead, time.Now().UnixNano())
@@ -1362,6 +1379,8 @@ func (t *http2Client) reader() {
 				return
 			}
 		}
+
+		// 看下帧是啥
 		switch frame := frame.(type) {
 		case *http2.MetaHeadersFrame:
 			t.operateHeaders(frame)
