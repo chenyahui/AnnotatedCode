@@ -53,13 +53,13 @@ func Every(interval time.Duration) Limit {
 // If no token is available, Wait blocks until one can be obtained
 // or its associated context.Context is canceled.
 //
-// The methods AllowN, ReserveN, and WaitN consume n tokens.
+// The methods AllowN, ReserveN, and consume n tokens.
 type Limiter struct {
-	limit Limit
-	burst int // 桶的总大小
+	limit Limit // 向令牌桶中放置 Token 的速率(如：1 秒放置 10 个 Token)
+	burst int // 令牌桶的容联
 
 	mu     sync.Mutex
-	tokens float64 // 桶中目前剩余的token数目，可以为负数。
+	tokens float64 // 令牌桶中目前剩余的token数目，可以为负数。
 	// last is the last time the limiter's tokens field was updated
 	last time.Time
 	// lastEvent is the latest time of a rate-limited event (past or future)
@@ -224,6 +224,7 @@ func (lim *Limiter) ReserveN(now time.Time, n int) *Reservation {
 	return &r
 }
 
+// Wait 和 WaitN 方法都是用于消费令牌桶中的令牌，其中当 n=1 时， Wait 方法相当于是 WaitN(ctx，1)，n 表示一次从令牌桶中获取令牌的数量
 // Wait is shorthand for WaitN(ctx, 1).
 func (lim *Limiter) Wait(ctx context.Context) (err error) {
 	return lim.WaitN(ctx, 1)
@@ -238,31 +239,38 @@ func (lim *Limiter) WaitN(ctx context.Context, n int) (err error) {
 	burst := lim.burst
 	limit := lim.limit
 	lim.mu.Unlock()
-
+        // 在 limit 不等于 Inf 的前提下，如果说 n 大于令牌桶的容量则 WaitN 直接返回 error，不再执行下面的处理逻辑
 	if n > burst && limit != Inf {
 		return fmt.Errorf("rate: Wait(n=%d) exceeds limiter's burst %d", n, lim.burst)
 	}
 	// Check if ctx is already cancelled
+	// 判断 context 是否被取消，如果 context 被取消了 WaitN 返回 error，不再执行下面的处理逻辑
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
 	default:
 	}
+	
+	// 下面是针对 n 没有大于令牌桶容量并且 context 也没有被取消的处理逻辑
 	// Determine wait limit
+	// now 获取当前时间
 	now := time.Now()
 	waitLimit := InfDuration
+	// 判断 context 是否到了 deadline ，如果 context 到了 deadline 也就是 ok 为 true，则通过 Sub 方法计算出 context 被取消的时间
+	// 和当前时间的差值->waitLimit
 	if deadline, ok := ctx.Deadline(); ok {
 		waitLimit = deadline.Sub(now)
 	}
 
 	// Reserve
+	// 调用 reserveN 函数返回 Reservation 对象，相关细节查看 reserveN 函数的注释
 	r := lim.reserveN(now, n, waitLimit)
-
+        // reserveN 为 false 有两种情况：1、要获取的 token 数量大于令牌桶的容量 2、令牌桶所产生令牌的时间大于了需要等待的时间 也就是超出了 context deadline
 	if !r.ok {
 		return fmt.Errorf("rate: Wait(n=%d) would exceed context deadline", n)
 	}
 	// Wait if necessary
-	// delay为从当前时间开始，到满足条件，需要多长时间
+	// delay 为从当前时间开始，到满足条件，需要多长时间
 	delay := r.DelayFrom(now)
 
 	if delay == 0 {
@@ -323,7 +331,7 @@ func (lim *Limiter) SetBurstAt(now time.Time, newBurst int) {
 // reserveN is a helper method for AllowN, ReserveN, and WaitN.
 // maxFutureReserve specifies the maximum reservation wait duration allowed.
 // reserveN returns Reservation, not *Reservation, to avoid allocation in AllowN and WaitN.
-//
+// @parama now 当前系统时间
 // @param n 要消费的token数量
 // @param maxFutureReserve 愿意等待的最长时间
 func (lim *Limiter) reserveN(now time.Time, n int, maxFutureReserve time.Duration) Reservation {
@@ -339,24 +347,33 @@ func (lim *Limiter) reserveN(now time.Time, n int, maxFutureReserve time.Duratio
 			timeToAct: now,
 		}
 	}
-
+        
+	// 以下为 limit 有限制的处理逻辑
+	// 调用 advance 方法，获取当前桶中有多少令牌
 	now, last, tokens := lim.advance(now)
 
 	// Calculate the remaining number of tokens resulting from the request.
-	// 看下取完之后，桶还能剩能下多少token
+	// 计算取完 n 个令牌之后，桶还能剩能下多少token
 	tokens -= float64(n)
 
 	// Calculate the wait duration
-	// 如果token < 0, 说明目前的token不够，需要等待一段时间
+	// 如果token < 0, 说明目前的token不够，需要等待一段时间，调用 durationFromTokens 函数计算生成所需要令牌数量需要多长时间
 	var waitDuration time.Duration
 	if tokens < 0 {
 		waitDuration = lim.limit.durationFromTokens(-tokens)
 	}
 
 	// Decide result
+	// 这里 ok 为 false 和 true 要分为几种情况：
+	// true
+	// 1、要获取的令牌数量不大于令牌桶的容量 并且 获取所需要的令牌等待时间不大于最大愿意等待时间(也就是我要的没有超出你的能力，并且我也愿意等待，只要你给我就行)
+	// false
+	// 1、我所需要的令牌数量你没有那么多，尽管我愿意等待
+	// 2、我所需要的令牌数量没有超出的你能力，但是你现在没有那么多，你需要重新生产，可是你生产的时间太长，我等不了
 	ok := n <= lim.burst && waitDuration <= maxFutureReserve
 
 	// Prepare reservation
+	// Reservation 对象
 	r := Reservation{
 		ok:    ok,
 		lim:   lim,
@@ -387,25 +404,30 @@ func (lim *Limiter) reserveN(now time.Time, n int, maxFutureReserve time.Duratio
 
 // advance calculates and returns an updated state for lim resulting from the passage of time.
 // lim is not changed.
-// @param now
+// @param now 当前系统时间
 // @return newNow 似乎还是这个now，没变
 // @return newLast 如果 last > now, 则last为now
 // @return newTokens 当前桶中应有的数目
 func (lim *Limiter) advance(now time.Time) (newNow time.Time, newLast time.Time, newTokens float64) {
-	// last代表上一个取的时候的时间
+	// last is the last time the limiter's tokens field was updated
+	// last 表示的是上一次从令牌桶中取出 Token 的时间
 	last := lim.last
+	// todo:这一处暂时没有看太懂
 	if now.Before(last) {
 		last = now
 	}
 
 	// Avoid making delta overflow below when last is very old.
-	// maxElapsed表示，将Token桶填满需要多久
+	// durationFromTokens 函数主要用于计算生成 N 个 Token 需要多久，参数表示 Token 数量
+	// 从下面的使用中可以看到，maxElapsed 表示将Token桶填满需要多久（令牌桶总容量 - 令牌桶中已有的令牌数量）
 	// 为什么要拆分两步做，是为了防止后面的delta溢出
-	// 因为默认情况下，last为0，此时delta算出来的，会非常大
+	
+	// 为什么要拆分两步做，是为了防止后面的delta溢出，所谓的拆分成两步是指：1、先计算出填满令牌桶需要多久 2、当前时间到上一次取令牌这段时间内生成了多少 token 
+	// 必须要保证当前时间到上一次取 token 的时间差不能大于填满令牌桶所需要的时间，因为默认情况下，last为0，此时delta算出来的，会非常大
 	maxElapsed := lim.limit.durationFromTokens(float64(lim.burst) - lim.tokens)
 
 	// elapsed 表示从当前到上次一共过去了多久
-	// 当然了，elapsed不能大于将桶填满的时间
+	// elapsed不能大于将桶填满的时间
 	elapsed := now.Sub(last)
 	if elapsed > maxElapsed {
 		elapsed = maxElapsed
